@@ -26,9 +26,12 @@ async fn main() -> anyhow::Result<()> {
 
     tracing::info!("Starting Mesh Watchy application");
 
-    let config_location =  match env::var("CONFIG_CUSTOM") {
-        Ok(val) => { info!("custom config: {:?}", val); val }
-        Err(_) => { "config.toml".to_string() }
+    let config_location = match env::var("CONFIG_CUSTOM") {
+        Ok(val) => {
+            info!("custom config: {:?}", val);
+            val
+        }
+        Err(_) => "config.toml".to_string(),
     };
 
     // Load configuration
