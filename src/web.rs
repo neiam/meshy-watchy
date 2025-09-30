@@ -1,28 +1,31 @@
-use crate::database::Database;
-use crate::models::{NetworkOverview, PositionResponse, NodeInfo, MeshWatchyError, WebhookConfig, TelemetryDisplay, RecentMessage, TextMessage};
-use crate::webhooks::{WebhookManager, WebhookStatus, TestResult};
 use crate::config::save_webhook_config;
+use crate::database::Database;
+use crate::models::{
+    MeshWatchyError, NetworkOverview, NodeInfo, PositionResponse, RecentMessage, TelemetryDisplay,
+    TextMessage, WebhookConfig,
+};
+use crate::webhooks::{TestResult, WebhookManager, WebhookStatus};
 use axum::{
-    body::{Body},
-    extract::{Path, Query, State, WebSocketUpgrade, ws::WebSocket},
+    body::Body,
+    extract::{ws::WebSocket, Path, Query, State, WebSocketUpgrade},
     http::{header, Request, Response, StatusCode},
-    response::{Html, Json, IntoResponse, Response as AxumResponse},
-    routing::{get, post, put, delete},
+    response::{Html, IntoResponse, Json, Response as AxumResponse},
+    routing::{delete, get, post, put},
     Router,
 };
-use std::collections::HashMap;
-use std::sync::Arc;
-use std::convert::Infallible;
-use std::task::{Context, Poll};
-use serde::{Deserialize, Serialize};
-use minijinja::{Environment, context};
+use futures::{sink::SinkExt, stream::StreamExt};
 use include_dir::{include_dir, Dir};
 use mime_guess::from_path;
+use minijinja::{context, Environment};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::convert::Infallible;
+use std::sync::Arc;
+use std::task::{Context, Poll};
+use tokio::sync::broadcast;
 use tower::Service;
 use tower_http::services::ServeDir;
 use tracing::info;
-use tokio::sync::broadcast;
-use futures::{sink::SinkExt, stream::StreamExt};
 
 // Static assets embedded during build
 static ASSETS_DIR: Dir<'_> = include_dir!("$CARGO_MANIFEST_DIR/assets/dist");
@@ -101,7 +104,6 @@ pub fn create_app(state: AppState) -> Router {
         .route("/messages", get(messages_handler))
         .route("/map", get(map_handler))
         .route("/webhooks", get(webhooks_handler))
-        
         // API endpoints
         .route("/api/overview", get(api_overview))
         .route("/api/positions", get(api_positions))
@@ -110,10 +112,8 @@ pub fn create_app(state: AppState) -> Router {
         .route("/api/stats", get(api_stats))
         .route("/api/telemetry", get(api_telemetry))
         .route("/api/telemetry/{node_id}", get(api_node_telemetry))
-
         // WebSocket endpoint
         .route("/ws", get(websocket_handler))
-
         // Webhook management API
         .route("/api/webhooks", get(api_get_webhooks))
         .route("/api/webhooks", post(api_add_webhook))
@@ -134,7 +134,7 @@ pub fn create_app(state: AppState) -> Router {
     {
         app = app.nest_service("/assets", ServeDir::new("assets/"));
     }
-    
+
     app
 }
 
@@ -142,176 +142,196 @@ pub fn create_app(state: AppState) -> Router {
 
 async fn dashboard_handler(State(state): State<AppState>) -> Result<Html<String>, StatusCode> {
     tracing::debug!("Dashboard handler called");
-    
-    let overview = state.database.get_network_overview().await
-        .map_err(|e| {
-            tracing::error!("Failed to get network overview: {}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
-    
-    let nodes = state.database.get_nodes_display().await
-        .map_err(|e| {
-            tracing::error!("Failed to get nodes: {}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
-    
-    let recent_positions = state.database.get_recent_positions(10).await
-        .map_err(|e| {
-            tracing::error!("Failed to get recent positions: {}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
-    
-    let recent_messages = state.database.get_recent_messages(20).await
-        .map_err(|e| {
-            tracing::error!("Failed to get recent messages: {}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
-    
-    let webhook_stats = state.webhook_manager.get_webhook_status().await;
-    
-    // Get message statistics
-    let message_stats = state.database.get_message_stats().await
-        .map_err(|e| {
-            tracing::error!("Failed to get message stats: {}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
-    
-    tracing::debug!("Getting template: dashboard.html");
-    let template = state.env.get_template("dashboard.html")
-        .map_err(|e| {
-            tracing::error!("Failed to get dashboard template: {}", e);
-            tracing::debug!("Available templates: {:?}", state.env.templates().collect::<Vec<_>>());
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
-        
-    tracing::debug!("Rendering template with context");
-    let html = template.render(context! {
-        overview => overview,
-        nodes => nodes,
-        recent_positions => recent_positions,
-        recent_messages => recent_messages,
-        webhook_stats => webhook_stats,
-        message_stats => message_stats,
-    }).map_err(|e| {
-        tracing::error!("Failed to render dashboard template: {}", e);
+
+    let overview = state.database.get_network_overview().await.map_err(|e| {
+        tracing::error!("Failed to get network overview: {}", e);
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
-    
+
+    let nodes = state.database.get_nodes_display().await.map_err(|e| {
+        tracing::error!("Failed to get nodes: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    let recent_positions = state.database.get_recent_positions(10).await.map_err(|e| {
+        tracing::error!("Failed to get recent positions: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    let recent_messages = state.database.get_recent_messages(20).await.map_err(|e| {
+        tracing::error!("Failed to get recent messages: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    let webhook_stats = state.webhook_manager.get_webhook_status().await;
+
+    // Get message statistics
+    let message_stats = state.database.get_message_stats().await.map_err(|e| {
+        tracing::error!("Failed to get message stats: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    tracing::debug!("Getting template: dashboard.html");
+    let template = state.env.get_template("dashboard.html").map_err(|e| {
+        tracing::error!("Failed to get dashboard template: {}", e);
+        tracing::debug!(
+            "Available templates: {:?}",
+            state.env.templates().collect::<Vec<_>>()
+        );
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    tracing::debug!("Rendering template with context");
+    let html = template
+        .render(context! {
+            overview => overview,
+            nodes => nodes,
+            recent_positions => recent_positions,
+            recent_messages => recent_messages,
+            webhook_stats => webhook_stats,
+            message_stats => message_stats,
+        })
+        .map_err(|e| {
+            tracing::error!("Failed to render dashboard template: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
     tracing::debug!("Dashboard rendered successfully, {} bytes", html.len());
     Ok(Html(html))
 }
 
 async fn nodes_handler(State(state): State<AppState>) -> Result<Html<String>, StatusCode> {
-    let nodes = state.database.get_nodes_display().await
+    let nodes = state
+        .database
+        .get_nodes_display()
+        .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    
-    let template = state.env.get_template("nodes.html")
+
+    let template = state
+        .env
+        .get_template("nodes.html")
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-        
-    let html = template.render(context! {
-        nodes => nodes,
-    }).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    
+
+    let html = template
+        .render(context! {
+            nodes => nodes,
+        })
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
     Ok(Html(html))
 }
 
 async fn messages_handler(State(state): State<AppState>) -> Result<Html<String>, StatusCode> {
     tracing::debug!("Messages handler called");
-    
-    let text_messages = state.database.get_recent_text_messages(50).await
+
+    let text_messages = state
+        .database
+        .get_recent_text_messages(50)
+        .await
         .map_err(|e| {
             tracing::error!("Failed to get text messages: {}", e);
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
-    
+
     tracing::debug!("Retrieved {} text messages", text_messages.len());
-    
-    let template = state.env.get_template("messages.html")
-        .map_err(|e| {
-            tracing::error!("Failed to get messages template: {}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
-        
-    tracing::debug!("Got messages template successfully");
-    
-    let html = template.render(context! {
-        text_messages => text_messages,
-    }).map_err(|e| {
-        tracing::error!("Failed to render messages template: {}", e);
+
+    let template = state.env.get_template("messages.html").map_err(|e| {
+        tracing::error!("Failed to get messages template: {}", e);
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
-    
+
+    tracing::debug!("Got messages template successfully");
+
+    let html = template
+        .render(context! {
+            text_messages => text_messages,
+        })
+        .map_err(|e| {
+            tracing::error!("Failed to render messages template: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
     tracing::debug!("Messages rendered successfully, {} bytes", html.len());
     Ok(Html(html))
 }
 
 async fn map_handler(State(state): State<AppState>) -> Result<Html<String>, StatusCode> {
     tracing::debug!("Map handler called");
-    
-    let positions = state.database.get_recent_positions_with_info(100).await
+
+    let positions = state
+        .database
+        .get_recent_positions_with_info(100)
+        .await
         .map_err(|e| {
             tracing::error!("Failed to get recent positions with info: {}", e);
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
-    
+
     tracing::debug!("Retrieved {} positions for map", positions.len());
-    
-    let positions_json = serde_json::to_string(&positions)
-        .map_err(|e| {
-            tracing::error!("Failed to serialize positions to JSON: {}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
-    
-    tracing::debug!("Serialized positions JSON, {} bytes", positions_json.len());
-    
-    let template = state.env.get_template("map.html")
-        .map_err(|e| {
-            tracing::error!("Failed to get map template: {}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
-    
-    tracing::debug!("Got map template successfully");
-        
-    let html = template.render(context! {
-        positions => positions,
-        positions_json => positions_json,
-    }).map_err(|e| {
-        tracing::error!("Failed to render map template: {}", e);
+
+    let positions_json = serde_json::to_string(&positions).map_err(|e| {
+        tracing::error!("Failed to serialize positions to JSON: {}", e);
         StatusCode::INTERNAL_SERVER_ERROR
     })?;
-    
+
+    tracing::debug!("Serialized positions JSON, {} bytes", positions_json.len());
+
+    let template = state.env.get_template("map.html").map_err(|e| {
+        tracing::error!("Failed to get map template: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
+    tracing::debug!("Got map template successfully");
+
+    let html = template
+        .render(context! {
+            positions => positions,
+            positions_json => positions_json,
+        })
+        .map_err(|e| {
+            tracing::error!("Failed to render map template: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
     tracing::debug!("Map rendered successfully, {} bytes", html.len());
     Ok(Html(html))
 }
 
 async fn webhooks_handler(State(state): State<AppState>) -> Result<Html<String>, StatusCode> {
     let webhooks = state.webhook_manager.get_webhook_status().await;
-    
+
     let total_webhooks = webhooks.len();
     let enabled_webhooks = webhooks.iter().filter(|w| w.enabled).count();
     let total_sent: u64 = webhooks.iter().map(|w| w.total_sent).sum();
     let total_failed: u64 = webhooks.iter().map(|w| w.total_failed).sum();
-    
-    let template = state.env.get_template("webhooks.html")
+
+    let template = state
+        .env
+        .get_template("webhooks.html")
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-        
-    let html = template.render(context! {
-        webhooks => webhooks,
-        total_webhooks => total_webhooks,
-        enabled_webhooks => enabled_webhooks,
-        total_sent => total_sent,
-        total_failed => total_failed,
-    }).map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    
+
+    let html = template
+        .render(context! {
+            webhooks => webhooks,
+            total_webhooks => total_webhooks,
+            enabled_webhooks => enabled_webhooks,
+            total_sent => total_sent,
+            total_failed => total_failed,
+        })
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
     Ok(Html(html))
 }
 
 // API handlers
 
 async fn api_overview(State(state): State<AppState>) -> Result<Json<NetworkOverview>, StatusCode> {
-    let overview = state.database.get_network_overview().await
+    let overview = state
+        .database
+        .get_network_overview()
+        .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    
+
     Ok(Json(overview))
 }
 
@@ -320,44 +340,63 @@ async fn api_positions(
     Query(query): Query<PositionQuery>,
 ) -> Result<Json<Vec<PositionResponse>>, StatusCode> {
     let limit = query.limit.unwrap_or(50).min(1000); // Cap at 1000
-    
+
     // Parse node IDs filter if provided
     let node_ids = if let Some(nodes_str) = &query.nodes {
         if !nodes_str.trim().is_empty() {
-            Some(nodes_str
-                .split(',')
-                .filter_map(|s| s.trim().parse::<i64>().ok())
-                .collect::<Vec<i64>>())
+            Some(
+                nodes_str
+                    .split(',')
+                    .filter_map(|s| s.trim().parse::<i64>().ok())
+                    .collect::<Vec<i64>>(),
+            )
         } else {
             None
         }
     } else {
         None
     };
-    
-    let positions = state.database.get_recent_positions_filtered(limit, node_ids).await
+
+    let positions = state
+        .database
+        .get_recent_positions_filtered(limit, node_ids)
+        .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    
+
     Ok(Json(positions))
 }
 
 async fn api_nodes(State(state): State<AppState>) -> Result<Json<Vec<NodeInfo>>, StatusCode> {
-    let nodes = state.database.get_nodes().await
+    let nodes = state
+        .database
+        .get_nodes()
+        .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    
+
     Ok(Json(nodes))
 }
 
-async fn api_stats(State(state): State<AppState>) -> Result<Json<HashMap<String, serde_json::Value>>, StatusCode> {
-    let message_stats = state.database.get_message_stats().await
+async fn api_stats(
+    State(state): State<AppState>,
+) -> Result<Json<HashMap<String, serde_json::Value>>, StatusCode> {
+    let message_stats = state
+        .database
+        .get_message_stats()
+        .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    
+
     let webhook_stats = state.webhook_manager.get_stats().await;
-    
+
     let mut stats = HashMap::new();
-    stats.insert("messages".to_string(), serde_json::to_value(message_stats).unwrap());
-    stats.insert("webhooks".to_string(), serde_json::to_value(webhook_stats).unwrap());
-    
+    stats.insert(
+        "messages".to_string(),
+        serde_json::to_value(message_stats).unwrap(),
+    );
+    stats.insert(
+        "webhooks".to_string(),
+        serde_json::to_value(webhook_stats).unwrap(),
+    );
+
     Ok(Json(stats))
 }
 
@@ -368,25 +407,29 @@ async fn api_messages(
     Query(query): Query<PositionQuery>, // Reuse the PositionQuery for limit parameter
 ) -> Result<Json<Vec<TextMessage>>, StatusCode> {
     let limit = query.limit.unwrap_or(50).min(1000); // Cap at 1000
-    
-    let text_messages = state.database.get_recent_text_messages(limit).await
+
+    let text_messages = state
+        .database
+        .get_recent_text_messages(limit)
+        .await
         .map_err(|e| {
             tracing::error!("Failed to get text messages: {}", e);
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
-    
+
     Ok(Json(text_messages))
 }
 
 // Telemetry API handlers
 
-async fn api_telemetry(State(state): State<AppState>) -> Result<Json<Vec<TelemetryDisplay>>, StatusCode> {
-    let telemetry = state.database.get_recent_telemetry(50).await
-        .map_err(|e| {
-            tracing::error!("Failed to get recent telemetry: {}", e);
-            StatusCode::INTERNAL_SERVER_ERROR
-        })?;
-    
+async fn api_telemetry(
+    State(state): State<AppState>,
+) -> Result<Json<Vec<TelemetryDisplay>>, StatusCode> {
+    let telemetry = state.database.get_recent_telemetry(50).await.map_err(|e| {
+        tracing::error!("Failed to get recent telemetry: {}", e);
+        StatusCode::INTERNAL_SERVER_ERROR
+    })?;
+
     Ok(Json(telemetry))
 }
 
@@ -394,18 +437,23 @@ async fn api_node_telemetry(
     State(state): State<AppState>,
     Path(node_id): Path<String>,
 ) -> Result<Json<Vec<TelemetryDisplay>>, StatusCode> {
-    let telemetry = state.database.get_node_telemetry_history(&node_id, 100).await
+    let telemetry = state
+        .database
+        .get_node_telemetry_history(&node_id, 100)
+        .await
         .map_err(|e| {
             tracing::error!("Failed to get telemetry for node {}: {}", node_id, e);
             StatusCode::INTERNAL_SERVER_ERROR
         })?;
-    
+
     Ok(Json(telemetry))
 }
 
 // Webhook API handlers
 
-async fn api_get_webhooks(State(state): State<AppState>) -> Result<Json<Vec<WebhookStatus>>, StatusCode> {
+async fn api_get_webhooks(
+    State(state): State<AppState>,
+) -> Result<Json<Vec<WebhookStatus>>, StatusCode> {
     let webhooks = state.webhook_manager.get_webhook_status().await;
     Ok(Json(webhooks))
 }
@@ -415,14 +463,14 @@ async fn api_add_webhook(
     Json(webhook): Json<WebhookConfig>,
 ) -> Result<StatusCode, StatusCode> {
     state.webhook_manager.add_webhook(webhook).await;
-    
+
     // Persist changes to config file
     let webhooks = state.webhook_manager.get_webhooks().await;
     if let Err(e) = save_webhook_config("webhooks.toml", &webhooks).await {
         tracing::error!("Failed to save webhook config: {}", e);
         return Ok(StatusCode::INTERNAL_SERVER_ERROR);
     }
-    
+
     Ok(StatusCode::CREATED)
 }
 
@@ -468,7 +516,11 @@ async fn api_toggle_webhook(
     let webhooks = state.webhook_manager.get_webhooks().await;
     if let Some(webhook) = webhooks.iter().find(|w| w.name == name) {
         let new_enabled = !webhook.enabled;
-        if state.webhook_manager.set_webhook_enabled(&name, new_enabled).await {
+        if state
+            .webhook_manager
+            .set_webhook_enabled(&name, new_enabled)
+            .await
+        {
             // Persist changes to config file
             let webhooks = state.webhook_manager.get_webhooks().await;
             if let Err(e) = save_webhook_config("webhooks.toml", &webhooks).await {
@@ -488,9 +540,12 @@ async fn api_test_webhook(
     State(state): State<AppState>,
     Json(request): Json<TestWebhookRequest>,
 ) -> Result<Json<TestResult>, StatusCode> {
-    let result = state.webhook_manager.test_webhook(&request.webhook).await
+    let result = state
+        .webhook_manager
+        .test_webhook(&request.webhook)
+        .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
-    
+
     Ok(Json(result))
 }
 
@@ -501,27 +556,26 @@ async fn api_reset_webhook_stats(State(state): State<AppState>) -> Result<Status
 
 // WebSocket handler
 
-async fn websocket_handler(
-    ws: WebSocketUpgrade,
-    State(state): State<AppState>,
-) -> AxumResponse {
+async fn websocket_handler(ws: WebSocketUpgrade, State(state): State<AppState>) -> AxumResponse {
     ws.on_upgrade(move |socket| handle_websocket(socket, state))
 }
 
 async fn handle_websocket(socket: WebSocket, state: AppState) {
     let mut rx = state.ws_tx.subscribe();
     let (mut ws_sender, mut ws_receiver) = socket.split();
-    
+
     tracing::info!("WebSocket connected");
-    
+
     // Send initial data
     if let Ok(overview) = state.database.get_network_overview().await {
         let initial_msg = WsMessage::NetworkStats { overview };
         if let Ok(json) = serde_json::to_string(&initial_msg) {
-            let _ = ws_sender.send(axum::extract::ws::Message::Text(json.into())).await;
+            let _ = ws_sender
+                .send(axum::extract::ws::Message::Text(json.into()))
+                .await;
         }
     }
-    
+
     // Handle incoming and outgoing messages
     loop {
         tokio::select! {
@@ -571,7 +625,7 @@ async fn handle_websocket(socket: WebSocket, state: AppState) {
             }
         }
     }
-    
+
     tracing::info!("WebSocket disconnected");
 }
 
@@ -589,44 +643,53 @@ pub async fn start_server(
     state: AppState,
 ) -> Result<(), MeshWatchyError> {
     let app = create_app(state);
-    
+
     let listener = tokio::net::TcpListener::bind(format!("{}:{}", bind_address, bind_port))
         .await
-        .map_err(|e| MeshWatchyError::Config(format!("Failed to bind to {}:{}: {}", bind_address, bind_port, e)))?;
-    
-    tracing::info!("Web server starting on http://{}:{}", bind_address, bind_port);
-    
+        .map_err(|e| {
+            MeshWatchyError::Config(format!(
+                "Failed to bind to {}:{}: {}",
+                bind_address, bind_port, e
+            ))
+        })?;
+
+    tracing::info!(
+        "Web server starting on http://{}:{}",
+        bind_address,
+        bind_port
+    );
+
     axum::serve(listener, app)
         .await
         .map_err(|e| MeshWatchyError::Config(format!("Web server error: {}", e)))?;
-    
+
     Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use axum_test::TestServer;
     use crate::database::Database;
     use crate::webhooks::WebhookManager;
-    
+    use axum_test::TestServer;
+
     async fn create_test_state() -> AppState {
         let database = Database::new("sqlite::memory:").await.unwrap();
-        
+
         // Ensure tables exist by initializing schema
         if let Err(e) = database.initialize_schema().await {
             panic!("Failed to initialize test database schema: {}", e);
         }
-        
+
         // Test that we can query the database
         if let Err(e) = database.get_recent_positions_filtered(10, None).await {
             println!("Warning: Could not query test database: {}", e);
         }
-        
+
         let database = Arc::new(database);
         let webhook_manager = Arc::new(WebhookManager::new());
         let (ws_tx, _) = broadcast::channel::<WsMessage>(1000);
-        
+
         AppState {
             database,
             webhook_manager,
@@ -634,53 +697,53 @@ mod tests {
             ws_tx: Arc::new(ws_tx),
         }
     }
-    
+
     #[tokio::test]
     async fn test_api_overview() {
         let state = create_test_state().await;
         let app = create_app(state);
         let server = TestServer::new(app).unwrap();
-        
+
         let response = server.get("/api/overview").await;
         response.assert_status_ok();
-        
+
         let overview: NetworkOverview = response.json();
         assert_eq!(overview.total_nodes, 0);
     }
-    
+
     #[tokio::test]
     async fn test_api_positions() {
         let state = create_test_state().await;
         let app = create_app(state);
         let server = TestServer::new(app).unwrap();
-        
+
         let response = server.get("/api/positions").await;
-        
+
         // Debug: Check what we actually got
         if response.status_code() != 200 {
             println!("Response status: {}", response.status_code());
             println!("Response body: {}", response.text());
         }
-        
+
         response.assert_status_ok();
-        
+
         let positions: Vec<PositionResponse> = response.json();
         assert!(positions.is_empty());
     }
-    
+
     #[tokio::test]
     async fn test_webhook_api() {
         let state = create_test_state().await;
         let app = create_app(state);
         let server = TestServer::new(app).unwrap();
-        
+
         // Get initial webhooks (should be empty)
         let response = server.get("/api/webhooks").await;
         response.assert_status_ok();
-        
+
         let webhooks: Vec<WebhookStatus> = response.json();
         assert!(webhooks.is_empty());
-        
+
         // Add a webhook
         let webhook = WebhookConfig {
             name: "Test Webhook".to_string(),
@@ -690,14 +753,14 @@ mod tests {
             headers: None,
             devices: vec![],
         };
-        
+
         let response = server.post("/api/webhooks").json(&webhook).await;
         response.assert_status(StatusCode::CREATED);
-        
+
         // Get webhooks again (should have one)
         let response = server.get("/api/webhooks").await;
         response.assert_status_ok();
-        
+
         let webhooks: Vec<WebhookStatus> = response.json();
         assert_eq!(webhooks.len(), 1);
         assert_eq!(webhooks[0].name, "Test Webhook");

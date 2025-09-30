@@ -1,7 +1,7 @@
+use serde_json::Value;
+use sqlx::{Row, SqlitePool};
 use std::sync::Arc;
 use tracing::Level;
-use sqlx::{SqlitePool, Row};
-use serde_json::Value;
 
 mod config;
 mod database;
@@ -31,7 +31,7 @@ async fn main() -> anyhow::Result<()> {
 
     // Create the replay processor
     let replay_processor = TextMessagesReplayProcessor::new(database);
-    
+
     // Run the replay
     replay_processor.run().await?;
 
@@ -53,7 +53,7 @@ impl TextMessagesReplayProcessor {
 
         // Get all text messages from mesh_messages table
         let text_messages = self.get_text_messages().await?;
-        
+
         tracing::info!("Found {} text messages to process", text_messages.len());
 
         let mut processed_count = 0;
@@ -67,11 +67,11 @@ impl TextMessagesReplayProcessor {
                     if was_inserted {
                         inserted_count += 1;
                     }
-                    
+
                     if processed_count % 100 == 0 {
                         tracing::info!("Processed {} messages so far...", processed_count);
                     }
-                },
+                }
                 Err(e) => {
                     error_count += 1;
                     tracing::error!("Error processing message: {}", e);
@@ -80,8 +80,8 @@ impl TextMessagesReplayProcessor {
         }
 
         tracing::info!(
-            "Replay completed: {} processed, {} inserted, {} errors", 
-            processed_count, 
+            "Replay completed: {} processed, {} inserted, {} errors",
+            processed_count,
             inserted_count,
             error_count
         );
@@ -103,7 +103,7 @@ impl TextMessagesReplayProcessor {
             WHERE payload LIKE '%"text"%'
                 AND json_extract(payload, '$.text') IS NOT NULL
             ORDER BY timestamp ASC
-            "#
+            "#,
         )
         .fetch_all(&self.database.pool)
         .await?;
@@ -124,22 +124,25 @@ impl TextMessagesReplayProcessor {
         Ok(messages)
     }
 
-    async fn process_text_message(&self, message: TextMessageRecord) -> Result<bool, MeshWatchyError> {
+    async fn process_text_message(
+        &self,
+        message: TextMessageRecord,
+    ) -> Result<bool, MeshWatchyError> {
         // Check if this text message already exists in the text_messages table
         let exists = self.text_message_exists(message.id).await?;
-        
+
         if exists {
             tracing::debug!("Text message {} already exists, skipping", message.id);
             return Ok(false);
         }
 
         // Parse the payload as JSON
-        let payload_json: Value = serde_json::from_str(&message.payload)
-            .map_err(|e| MeshWatchyError::Json(e))?;
+        let payload_json: Value =
+            serde_json::from_str(&message.payload).map_err(|e| MeshWatchyError::Json(e))?;
 
         // Try to deserialize into TextMessagePayload
-        let text_payload: TextMessagePayload = serde_json::from_value(payload_json)
-            .map_err(|e| MeshWatchyError::Json(e))?;
+        let text_payload: TextMessagePayload =
+            serde_json::from_value(payload_json).map_err(|e| MeshWatchyError::Json(e))?;
 
         // Update message type to TEXT if it's currently UNKNOWN
         if message.message_type == "UNKNOWN" {
@@ -148,28 +151,31 @@ impl TextMessagesReplayProcessor {
 
         // Insert the text message
         self.insert_text_message(message.id, &text_payload).await?;
-        
+
         tracing::debug!(
-            "Inserted text message from {}: \"{}\"", 
+            "Inserted text message from {}: \"{}\"",
             message.sender_id,
             text_payload.text.chars().take(50).collect::<String>()
         );
-        
+
         Ok(true)
     }
 
     async fn text_message_exists(&self, message_id: i64) -> Result<bool, MeshWatchyError> {
-        let count: i64 = sqlx::query_scalar(
-            "SELECT COUNT(*) FROM text_messages WHERE message_id = ?"
-        )
-        .bind(message_id)
-        .fetch_one(&self.database.pool)
-        .await?;
+        let count: i64 =
+            sqlx::query_scalar("SELECT COUNT(*) FROM text_messages WHERE message_id = ?")
+                .bind(message_id)
+                .fetch_one(&self.database.pool)
+                .await?;
 
         Ok(count > 0)
     }
 
-    async fn insert_text_message(&self, message_id: i64, text_payload: &TextMessagePayload) -> Result<(), MeshWatchyError> {
+    async fn insert_text_message(
+        &self,
+        message_id: i64,
+        text_payload: &TextMessagePayload,
+    ) -> Result<(), MeshWatchyError> {
         sqlx::query(
             r#"
             INSERT OR REPLACE INTO text_messages
@@ -228,9 +234,9 @@ mod tests {
     async fn test_replay_processor() {
         let db = Database::new("sqlite::memory:").await.unwrap();
         let db_arc = Arc::new(db);
-        
+
         let processor = TextMessagesReplayProcessor::new(db_arc);
-        
+
         // Test that processor can be created without error
         assert!(processor.database.pool().is_closed() == false);
     }

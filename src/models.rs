@@ -207,34 +207,37 @@ impl TelemetryDisplay {
         if battery_levels.is_empty() {
             return "────────────────────".to_string(); // No data placeholder
         }
-        
-        battery_levels.iter().map(|level| {
-            match level {
-                None => '─', // No data
-                Some(level) => {
-                    let level = (*level).min(101).max(0); // Clamp to valid range
-                    
-                    if level > 100 {
-                        '🔌' // Plugged in / charging - but this might break the chart visually
-                    } else {
-                        // Map 0-100% to block characters (8 levels)
-                        match level {
-                            0..=12 => '▁',      // 0-12%: Lower one eighth block
-                            13..=25 => '▂',     // 13-25%: Lower one quarter block  
-                            26..=37 => '▃',     // 26-37%: Lower three eighths block
-                            38..=50 => '▄',     // 38-50%: Lower half block
-                            51..=62 => '▅',     // 51-62%: Lower five eighths block
-                            63..=75 => '▆',     // 63-75%: Lower three quarters block
-                            76..=87 => '▇',     // 76-87%: Lower seven eighths block
-                            88..=100 => '█',    // 88-100%: Full block
-                            _ => '?',           // Should not happen due to clamping
+
+        battery_levels
+            .iter()
+            .map(|level| {
+                match level {
+                    None => '─', // No data
+                    Some(level) => {
+                        let level = (*level).min(101).max(0); // Clamp to valid range
+
+                        if level > 100 {
+                            '🔌' // Plugged in / charging - but this might break the chart visually
+                        } else {
+                            // Map 0-100% to block characters (8 levels)
+                            match level {
+                                0..=12 => '▁',   // 0-12%: Lower one eighth block
+                                13..=25 => '▂',  // 13-25%: Lower one quarter block
+                                26..=37 => '▃',  // 26-37%: Lower three eighths block
+                                38..=50 => '▄',  // 38-50%: Lower half block
+                                51..=62 => '▅',  // 51-62%: Lower five eighths block
+                                63..=75 => '▆',  // 63-75%: Lower three quarters block
+                                76..=87 => '▇',  // 76-87%: Lower seven eighths block
+                                88..=100 => '█', // 88-100%: Full block
+                                _ => '?',        // Should not happen due to clamping
+                            }
                         }
                     }
                 }
-            }
-        }).collect()
+            })
+            .collect()
     }
-    
+
     /// Convert a single battery level to a block character (for backwards compatibility)
     pub fn battery_level_to_chart(battery_level: Option<i32>) -> String {
         Self::battery_levels_to_time_chart(&[battery_level])
@@ -358,16 +361,16 @@ pub struct RecentMessage {
 pub enum MeshWatchyError {
     #[error("Database error: {0}")]
     Database(#[from] sqlx::Error),
-    
+
     #[error("MQTT error: {0}")]
     Mqtt(#[from] rumqttc::ClientError),
-    
+
     #[error("JSON parsing error: {0}")]
     Json(#[from] serde_json::Error),
-    
+
     #[error("Configuration error: {0}")]
     Config(String),
-    
+
     #[error("Webhook error: {0}")]
     Webhook(#[from] reqwest::Error),
 }

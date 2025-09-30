@@ -1,7 +1,7 @@
+use serde_json::Value;
+use sqlx::{Row, SqlitePool};
 use std::sync::Arc;
 use tracing::Level;
-use sqlx::{SqlitePool, Row};
-use serde_json::Value;
 
 mod config;
 mod database;
@@ -31,7 +31,7 @@ async fn main() -> anyhow::Result<()> {
 
     // Create the replay processor
     let replay_processor = NodeInfoReplayProcessor::new(database);
-    
+
     // Run the replay
     replay_processor.run().await?;
 
@@ -53,8 +53,11 @@ impl NodeInfoReplayProcessor {
 
         // Get all node info messages from mesh_messages table
         let node_info_messages = self.get_node_info_messages().await?;
-        
-        tracing::info!("Found {} node info messages to process", node_info_messages.len());
+
+        tracing::info!(
+            "Found {} node info messages to process",
+            node_info_messages.len()
+        );
 
         let mut processed_count = 0;
         let mut error_count = 0;
@@ -67,11 +70,11 @@ impl NodeInfoReplayProcessor {
                     if was_updated {
                         updated_count += 1;
                     }
-                    
+
                     if processed_count % 100 == 0 {
                         tracing::info!("Processed {} messages so far...", processed_count);
                     }
-                },
+                }
                 Err(e) => {
                     error_count += 1;
                     tracing::error!("Error processing message: {}", e);
@@ -80,8 +83,8 @@ impl NodeInfoReplayProcessor {
         }
 
         tracing::info!(
-            "Replay completed: {} processed, {} updated, {} errors", 
-            processed_count, 
+            "Replay completed: {} processed, {} updated, {} errors",
+            processed_count,
             updated_count,
             error_count
         );
@@ -100,7 +103,7 @@ impl NodeInfoReplayProcessor {
             FROM mesh_messages 
             WHERE message_type = 'NODEINFO' 
             ORDER BY timestamp ASC
-            "#
+            "#,
         )
         .fetch_all(&self.database.pool)
         .await?;
@@ -118,29 +121,34 @@ impl NodeInfoReplayProcessor {
         Ok(messages)
     }
 
-    async fn process_node_info_message(&self, message: NodeInfoMessage) -> Result<bool, MeshWatchyError> {
+    async fn process_node_info_message(
+        &self,
+        message: NodeInfoMessage,
+    ) -> Result<bool, MeshWatchyError> {
         // Parse the payload as JSON
-        let payload_json: Value = serde_json::from_str(&message.payload)
-            .map_err(|e| MeshWatchyError::Json(e))?;
+        let payload_json: Value =
+            serde_json::from_str(&message.payload).map_err(|e| MeshWatchyError::Json(e))?;
 
         // Try to deserialize into NodeInfoPayload
-        let node_info: NodeInfoPayload = serde_json::from_value(payload_json)
-            .map_err(|e| MeshWatchyError::Json(e))?;
+        let node_info: NodeInfoPayload =
+            serde_json::from_value(payload_json).map_err(|e| MeshWatchyError::Json(e))?;
 
         // Check if this node already exists and if this message is newer
-        let should_update = self.should_update_node_info(&node_info.id, message.timestamp).await?;
+        let should_update = self
+            .should_update_node_info(&node_info.id, message.timestamp)
+            .await?;
 
         if should_update {
             // Insert or update the node info
             self.upsert_node_info(&node_info, message.timestamp).await?;
-            
+
             tracing::debug!(
-                "Updated node info for {}: {} ({})", 
-                node_info.id, 
-                node_info.longname, 
+                "Updated node info for {}: {} ({})",
+                node_info.id,
+                node_info.longname,
                 node_info.shortname
             );
-            
+
             Ok(true)
         } else {
             tracing::debug!("Skipping older node info message for {}", node_info.id);
@@ -148,13 +156,16 @@ impl NodeInfoReplayProcessor {
         }
     }
 
-    async fn should_update_node_info(&self, node_id: &str, timestamp: i64) -> Result<bool, MeshWatchyError> {
-        let existing_timestamp: Option<i64> = sqlx::query_scalar(
-            "SELECT last_seen FROM node_info WHERE node_id = ?"
-        )
-        .bind(node_id)
-        .fetch_optional(&self.database.pool)
-        .await?;
+    async fn should_update_node_info(
+        &self,
+        node_id: &str,
+        timestamp: i64,
+    ) -> Result<bool, MeshWatchyError> {
+        let existing_timestamp: Option<i64> =
+            sqlx::query_scalar("SELECT last_seen FROM node_info WHERE node_id = ?")
+                .bind(node_id)
+                .fetch_optional(&self.database.pool)
+                .await?;
 
         match existing_timestamp {
             Some(existing) => Ok(timestamp > existing),
@@ -162,7 +173,11 @@ impl NodeInfoReplayProcessor {
         }
     }
 
-    async fn upsert_node_info(&self, node_info: &NodeInfoPayload, timestamp: i64) -> Result<(), MeshWatchyError> {
+    async fn upsert_node_info(
+        &self,
+        node_info: &NodeInfoPayload,
+        timestamp: i64,
+    ) -> Result<(), MeshWatchyError> {
         sqlx::query(
             r#"
             INSERT OR REPLACE INTO node_info
@@ -208,9 +223,9 @@ mod tests {
     async fn test_replay_processor() {
         let db = Database::new("sqlite::memory:").await.unwrap();
         let db_arc = Arc::new(db);
-        
+
         let processor = NodeInfoReplayProcessor::new(db_arc);
-        
+
         // Test that processor can be created without error
         assert!(processor.database.pool().is_closed() == false);
     }
