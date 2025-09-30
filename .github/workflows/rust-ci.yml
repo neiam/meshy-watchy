@@ -12,18 +12,10 @@ env:
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  build:
-    strategy:
-      matrix:
-        include:
-          - runner: ubuntu-latest
-            arch: x86_64
-          - runner: [self-hosted, runner-aarch64]
-            arch: aarch64
-    runs-on: ${{ matrix.runner }}
+  test:
+    runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write
 
     steps:
       - uses: actions/checkout@v3
@@ -58,6 +50,31 @@ jobs:
       - name: Check
         run: cargo check
 
+  docker:
+    needs: test
+    strategy:
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            arch: x86_64
+          - runner: [self-hosted, runner-aarch64]
+            arch: aarch64
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+      
+      - name: Build frontend assets
+        run: cd assets && npm ci && npm run build:all
+
       - name: Log in to the Container registry
         uses: docker/login-action@v2
         with:
@@ -70,6 +87,11 @@ jobs:
         uses: docker/metadata-action@v4
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v4
