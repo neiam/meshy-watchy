@@ -61,17 +61,45 @@ impl Database {
                 let _ = std::fs::remove_file(test_file_path);
             }
 
-            tracing::debug!(
-                "Database file will be created at: {:?}",
-                if db_path.is_absolute() {
-                    db_path.to_path_buf()
-                } else {
-                    current_dir.join(path)
+            let final_db_path = if db_path.is_absolute() {
+                db_path.to_path_buf()
+            } else {
+                current_dir.join(path)
+            };
+
+            tracing::debug!("Database file will be created at: {:?}", final_db_path);
+
+            // Pre-create the database file to ensure it exists and is writable
+            if !final_db_path.exists() {
+                tracing::debug!("Database file doesn't exist, creating it: {:?}", final_db_path);
+                if let Err(e) = std::fs::File::create(&final_db_path) {
+                    tracing::error!("Failed to create database file: {}", e);
+                    return Err(MeshWatchyError::Config(format!(
+                        "Cannot create database file '{}': {}. Check permissions or use a different database path.",
+                        final_db_path.display(),
+                        e
+                    )));
                 }
-            );
+                tracing::info!("Successfully created database file: {:?}", final_db_path);
+            } else {
+                tracing::debug!("Database file already exists: {:?}", final_db_path);
+            }
+
+            // Test that we can write to the database file
+            if let Err(e) = std::fs::OpenOptions::new().write(true).append(true).open(&final_db_path) {
+                tracing::error!("Cannot open database file for writing: {}", e);
+                return Err(MeshWatchyError::Config(format!(
+                    "Cannot open database file '{}' for writing: {}. Check permissions.",
+                    final_db_path.display(),
+                    e
+                )));
+            }
+
+            tracing::debug!("Database file is writable: {:?}", final_db_path);
         }
 
-        // Connect to database (SQLite will create the file if it doesn't exist)
+        // Connect to database (SQLite should now be able to open the pre-created file)
+        tracing::debug!("Attempting SQLite connection with URL: {}", database_url);
         let pool = SqlitePool::connect(database_url).await.map_err(|e| {
             tracing::error!("Failed to connect to database '{}': {}", database_url, e);
             e

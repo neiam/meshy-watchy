@@ -1271,6 +1271,7 @@ dependencies = [
  "chrono",
  "futures",
  "include_dir",
+ "libsqlite3-sys",
  "mime_guess",
  "minijinja",
  "minijinja-embed",
