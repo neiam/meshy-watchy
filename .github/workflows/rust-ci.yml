@@ -13,7 +13,14 @@ env:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            arch: x86_64
+          - runner: [self-hosted, runner-aarch64]
+            arch: aarch64
+    runs-on: ${{ matrix.runner }}
     permissions:
       contents: read
       packages: write
