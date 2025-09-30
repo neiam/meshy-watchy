@@ -39,7 +39,7 @@ COPY --from=builder /usr/src/meshwatchy/config.container.toml /app/config.toml
 COPY --from=builder /usr/src/meshwatchy/static /app/static/
 COPY --from=builder /usr/src/meshwatchy/templates /app/templates/
 COPY --from=builder /usr/src/meshwatchy/assets/dist /app/assets/dist/
-COPY --from=builder /usr/src/meshwatchy/webhooks.toml /app/
+#COPY --from=builder /usr/src/meshwatchy/webhooks.toml /app/
 
 # Create a volume for persistent data
 VOLUME ["/app/data"]

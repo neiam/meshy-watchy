@@ -1,0 +1,30 @@
+# Mesh Watchy Configuration File for Container Deployment
+# This file contains the main configuration for the Mesh Watchy application running in containers
+
+[mqtt]
+# MQTT broker settings
+broker_host = "localhost"
+broker_port = 1883
+# Optional authentication - uncomment and set if required
+# username = ""
+# password = ""
+
+# MQTT topics to subscribe to
+# Subscribe to US region by default, but can be modified for other regions
+topics = ["msh/US/+/json/+/+"]
+
+[database]
+# SQLite database configuration - using /app/data for container persistence
+url = "sqlite:/app/data/mesh_watchy.db"
+max_connections = 10
+
+[web]
+# Web server configuration - bind to all interfaces for container access
+bind_address = "0.0.0.0"
+bind_port = 3008
+static_dir = "static"
+templates_dir = "templates"
+
+# Webhook configuration file path
+# Webhooks are configured in a separate file for easier management
+# See webhooks.toml for webhook configuration
