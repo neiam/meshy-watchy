@@ -1,5 +1,5 @@
 # Use the official Rust image as a parent image
-FROM rust:1.87 as builder
+FROM rust:1.90 as builder
 
 # Set the working directory in the container
 WORKDIR /usr/src/meshwatchy
