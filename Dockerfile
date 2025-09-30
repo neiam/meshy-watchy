@@ -36,7 +36,7 @@ COPY --from=builder /usr/src/meshwatchy/target/release/mesh-watchy /usr/local/bi
 
 # Copy required runtime files
 COPY --from=builder /usr/src/meshwatchy/config.container.toml /app/config.toml
-COPY --from=builder /usr/src/meshwatchy/static /app/static/
+#COPY --from=builder /usr/src/meshwatchy/static /app/static/
 COPY --from=builder /usr/src/meshwatchy/templates /app/templates/
 COPY --from=builder /usr/src/meshwatchy/assets/dist /app/assets/dist/
 #COPY --from=builder /usr/src/meshwatchy/webhooks.toml /app/
