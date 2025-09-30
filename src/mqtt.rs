@@ -168,7 +168,7 @@ impl MqttClient {
                 to_node: Some(raw_message.to.to_string()),
                 channel: Some(raw_message.channel),
                 timestamp: chrono::DateTime::from_timestamp(raw_message.timestamp, 0)
-                    .unwrap_or_else(|| chrono::Utc::now()),
+                    .unwrap_or_else(chrono::Utc::now),
                 gateway: Some(clean_topic.clone()),
                 raw_json: raw_message.payload.clone(),
             };
@@ -193,7 +193,7 @@ impl MqttClient {
     /// Parse raw payload and infer message structure from topic and content
     fn parse_raw_payload(payload: &str, topic: &str) -> Result<RawMqttMessage, MeshWatchyError> {
         let payload_json: serde_json::Value =
-            serde_json::from_str(payload).map_err(|e| MeshWatchyError::Json(e))?;
+            serde_json::from_str(payload).map_err(MeshWatchyError::Json)?;
 
         // Extract node info from topic: msh/Zoo/2/json/ZooNet/!f9943e58
         let topic_parts: Vec<&str> = topic.split('/').collect();

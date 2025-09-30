@@ -127,11 +127,11 @@ impl NodeInfoReplayProcessor {
     ) -> Result<bool, MeshWatchyError> {
         // Parse the payload as JSON
         let payload_json: Value =
-            serde_json::from_str(&message.payload).map_err(|e| MeshWatchyError::Json(e))?;
+            serde_json::from_str(&message.payload).map_err(MeshWatchyError::Json)?;
 
         // Try to deserialize into NodeInfoPayload
         let node_info: NodeInfoPayload =
-            serde_json::from_value(payload_json).map_err(|e| MeshWatchyError::Json(e))?;
+            serde_json::from_value(payload_json).map_err(MeshWatchyError::Json)?;
 
         // Check if this node already exists and if this message is newer
         let should_update = self

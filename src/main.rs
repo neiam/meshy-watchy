@@ -10,7 +10,6 @@ mod webhooks;
 
 use config::{load_config, validate_config};
 use database::Database;
-use minijinja::Environment;
 use mqtt::MqttManager;
 use tokio::sync::broadcast;
 use web::{start_server, AppState};

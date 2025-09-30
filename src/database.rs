@@ -1,7 +1,6 @@
 use crate::models::{
     MeshMessage, MeshWatchyError, MessageType, NetworkOverview, NodeInfo, NodeInfoPayload,
-    PositionPayload, PositionResponse, PositionResponseDisplay, RawMqttMessage, RecentMessage,
-    TelemetryData, TelemetryDisplay, TelemetryPayload, TextMessage, TextMessagePayload,
+    PositionPayload, PositionResponse, PositionResponseDisplay, RawMqttMessage, RecentMessage, TelemetryDisplay, TelemetryPayload, TextMessage, TextMessagePayload,
 };
 use chrono::{DateTime, Utc};
 use sqlx::{Row, Sqlite, SqlitePool};
@@ -237,16 +236,16 @@ impl Database {
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             "#,
         )
-        .bind(&message.id)
-        .bind(&message.timestamp)
+        .bind(message.id)
+        .bind(message.timestamp)
         .bind(&message.message_type)
         .bind(&message.sender_id)
-        .bind(&message.from_node)
-        .bind(&message.channel)
-        .bind(&message.rssi)
-        .bind(&message.snr)
-        .bind(&message.hop_start)
-        .bind(&message.hops_away)
+        .bind(message.from_node)
+        .bind(message.channel)
+        .bind(message.rssi)
+        .bind(message.snr)
+        .bind(message.hop_start)
+        .bind(message.hops_away)
         .bind(&message.mqtt_topic)
         .bind(&message.payload)
         .execute(&mut *tx)
@@ -1012,7 +1011,7 @@ impl Database {
 
             node_data
                 .entry(node_id)
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(telemetry_entry);
         }
         let mut telemetry = Vec::new();

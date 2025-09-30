@@ -138,11 +138,11 @@ impl TextMessagesReplayProcessor {
 
         // Parse the payload as JSON
         let payload_json: Value =
-            serde_json::from_str(&message.payload).map_err(|e| MeshWatchyError::Json(e))?;
+            serde_json::from_str(&message.payload).map_err(MeshWatchyError::Json)?;
 
         // Try to deserialize into TextMessagePayload
         let text_payload: TextMessagePayload =
-            serde_json::from_value(payload_json).map_err(|e| MeshWatchyError::Json(e))?;
+            serde_json::from_value(payload_json).map_err(MeshWatchyError::Json)?;
 
         // Update message type to TEXT if it's currently UNKNOWN
         if message.message_type == "UNKNOWN" {
