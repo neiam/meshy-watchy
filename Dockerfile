@@ -7,18 +7,11 @@ WORKDIR /usr/src/meshwatchy
 # for paho
 RUN apt-get update && apt-get install -y cmake npm --no-install-recommends
 
-# First, copy and build frontend assets
-COPY assets/ ./assets/
-RUN cd assets && mkdir -p dist/css && npm ci && npm run build:all
+# Copy the entire project
+COPY . .
 
-# Copy the rest of the project (after assets are built)
-COPY Cargo.toml Cargo.lock ./
-COPY src/ ./src/
-COPY templates/ ./templates/
-COPY build.rs ./
-COPY static/ ./static/
-COPY config.toml ./
-COPY webhooks.toml ./
+# build the FE bullcrap
+RUN cd assets && mkdir -p dist/css && npm ci &&  npm run build:all
 
 # set some env shit for fuckery
 ENV CARGO_MANIFEST_DIR=/usr/src/meshwatchy

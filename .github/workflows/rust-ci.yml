@@ -21,6 +21,14 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+      
+      - name: Build frontend assets
+        run: cd assets && npm ci && npm run build:all
+
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
