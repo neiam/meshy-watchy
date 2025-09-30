@@ -611,7 +611,19 @@ mod tests {
     use crate::webhooks::WebhookManager;
     
     async fn create_test_state() -> AppState {
-        let database = Arc::new(Database::new("sqlite::memory:").await.unwrap());
+        let database = Database::new("sqlite::memory:").await.unwrap();
+        
+        // Ensure tables exist by initializing schema
+        if let Err(e) = database.initialize_schema().await {
+            panic!("Failed to initialize test database schema: {}", e);
+        }
+        
+        // Test that we can query the database
+        if let Err(e) = database.get_recent_positions_filtered(10, None).await {
+            println!("Warning: Could not query test database: {}", e);
+        }
+        
+        let database = Arc::new(database);
         let webhook_manager = Arc::new(WebhookManager::new());
         let (ws_tx, _) = broadcast::channel::<WsMessage>(1000);
         
@@ -643,6 +655,13 @@ mod tests {
         let server = TestServer::new(app).unwrap();
         
         let response = server.get("/api/positions").await;
+        
+        // Debug: Check what we actually got
+        if response.status_code() != 200 {
+            println!("Response status: {}", response.status_code());
+            println!("Response body: {}", response.text());
+        }
+        
         response.assert_status_ok();
         
         let positions: Vec<PositionResponse> = response.json();

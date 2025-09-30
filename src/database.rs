@@ -76,7 +76,7 @@ impl Database {
     }
     
     /// Initialize database schema
-    async fn initialize_schema(&self) -> Result<(), MeshWatchyError> {
+    pub async fn initialize_schema(&self) -> Result<(), MeshWatchyError> {
         // Create mesh_messages table
         sqlx::query(
             r#"
@@ -520,11 +520,11 @@ impl Database {
                 mm.snr
             FROM mesh_messages mm
             INNER JOIN position_data pd ON mm.id = pd.message_id
-            LEFT JOIN telemetry_data td ON mm.from_node = td.node_id 
-                AND td.timestamp = (
-                    SELECT MAX(timestamp) 
-                    FROM telemetry_data td2 
-                    WHERE td2.node_id = mm.from_node
+            LEFT JOIN telemetry_data td ON mm.id = td.message_id
+                AND td.message_id = (
+                    SELECT mm2.id 
+                    FROM mesh_messages mm2
+                    WHERE mm2.from_node = mm.from_node AND mm2.timestamp <= mm.timestamp ORDER BY mm2.timestamp DESC LIMIT 1
                 )
         "#.to_string();
         
@@ -884,12 +884,12 @@ impl Database {
             
             node_data.entry(node_id).or_insert_with(Vec::new).push(telemetry_entry);
         }
-        
-        // Create time series battery charts for each node
         let mut telemetry = Vec::new();
-        for (node_id, mut node_telemetry) in node_data {
-            // Sort by timestamp ascending for proper time series
-            node_telemetry.sort_by_key(|t| t.timestamp);
+        let mut _battery_levels: Vec<Option<i32>> = Vec::new();
+        
+        for (_node_id, mut node_telemetry) in node_data {
+            // Sort by timestamp so we display oldest to newest
+            node_telemetry.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
             
             // Extract battery levels in chronological order
             let battery_levels: Vec<Option<i32>> = node_telemetry
@@ -963,15 +963,8 @@ impl Database {
             });
         }
         
-        // Generate the complete time series chart
-        let complete_battery_chart = TelemetryDisplay::battery_levels_to_time_chart(&battery_levels);
-        
-        // Update each entry with the complete time series (showing progression over time)
-        for (i, entry) in telemetry.iter_mut().enumerate() {
-            // Show the progression up to this point in time
-            let partial_levels = &battery_levels[0..=i];
-            entry.battery_chart = TelemetryDisplay::battery_levels_to_time_chart(partial_levels);
-        }
+        // Generate complete battery chart for all nodes combined
+        let _complete_battery_chart = TelemetryDisplay::battery_levels_to_time_chart(&battery_levels);
         
         Ok(telemetry)
     }
