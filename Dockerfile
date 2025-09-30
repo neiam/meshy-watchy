@@ -13,6 +13,9 @@ COPY . .
 # build the FE bullcrap
 RUN cd assets && mkdir -p dist/css && npm ci &&  npm run build:all
 
+# set some env shit for fuckery
+ENV CARGO_MANIFEST_DIR=/usr/src/meshwatchy
+
 # Build the project
 RUN cargo build --release
 
