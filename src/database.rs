@@ -71,7 +71,10 @@ impl Database {
 
             // Pre-create the database file to ensure it exists and is writable
             if !final_db_path.exists() {
-                tracing::debug!("Database file doesn't exist, creating it: {:?}", final_db_path);
+                tracing::debug!(
+                    "Database file doesn't exist, creating it: {:?}",
+                    final_db_path
+                );
                 if let Err(e) = std::fs::File::create(&final_db_path) {
                     tracing::error!("Failed to create database file: {}", e);
                     return Err(MeshWatchyError::Config(format!(
@@ -86,7 +89,11 @@ impl Database {
             }
 
             // Test that we can write to the database file
-            if let Err(e) = std::fs::OpenOptions::new().write(true).append(true).open(&final_db_path) {
+            if let Err(e) = std::fs::OpenOptions::new()
+                .write(true)
+                .append(true)
+                .open(&final_db_path)
+            {
                 tracing::error!("Cannot open database file for writing: {}", e);
                 return Err(MeshWatchyError::Config(format!(
                     "Cannot open database file '{}' for writing: {}. Check permissions.",
