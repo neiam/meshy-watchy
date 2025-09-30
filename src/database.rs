@@ -1,6 +1,7 @@
 use crate::models::{
     MeshMessage, MeshWatchyError, MessageType, NetworkOverview, NodeInfo, NodeInfoPayload,
-    PositionPayload, PositionResponse, PositionResponseDisplay, RawMqttMessage, RecentMessage, TelemetryDisplay, TelemetryPayload, TextMessage, TextMessagePayload,
+    PositionPayload, PositionResponse, PositionResponseDisplay, RawMqttMessage, RecentMessage,
+    TelemetryDisplay, TelemetryPayload, TextMessage, TextMessagePayload,
 };
 use chrono::{DateTime, Utc};
 use sqlx::{Row, Sqlite, SqlitePool};
@@ -1009,10 +1010,7 @@ impl Database {
                 timestamp,
             };
 
-            node_data
-                .entry(node_id)
-                .or_default()
-                .push(telemetry_entry);
+            node_data.entry(node_id).or_default().push(telemetry_entry);
         }
         let mut telemetry = Vec::new();
         let mut _battery_levels: Vec<Option<i32>> = Vec::new();
