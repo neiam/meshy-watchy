@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="her">
+<head>
+    <meta charset="utf-8"/>
+    <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <link rel=icon href=/static/favicon.ico>
+    <link rel="stylesheet" href="/assets/dist/css/app.css"/>
+    <script defer src="/assets/dist/js/app.js"></script>
+    <title>Mesh Watchy :: {{ title|default("Dashboard") }}</title>
+</head>
+<body class="theme-transition">
+<!-- Theme Picker -->
+<div class="fixed top-4 right-4 z-50">
+    <div class="dropdown dropdown-end">
+        <div tabindex="0" role="button" class="btn btn-ghost btn-circle">
+            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M4 2a2 2 0 00-2 2v11a2 2 0 002 2h12a2 2 0 002-2V4a2 2 0 00-2-2H4zm0 2h12v11H4V4z" clip-rule="evenodd"/>
+            </svg>
+        </div>
+        <ul tabindex="0" class="dropdown-content z-[1] menu p-2 shadow bg-base-100 rounded-box w-52">
+            <li><a onclick="setTheme('her')">
+                <i class="fas fa-fw fa-heart"></i> Her
+            </a></li>
+            <li><a onclick="setTheme('afterdark')">
+                <i class="fas fa-fw fa-moon"></i> After Dark
+            </a></li>
+            <li><a onclick="setTheme('forest')">
+                <i class="fas fa-fw fa-tree"></i> Forest
+            </a></li>
+            <li><a onclick="setTheme('sky')">
+                <i class="fas fa-fw fa-cloud"></i> Sky
+            </a></li>
+            <li><a onclick="setTheme('clays')">
+                <i class="fas fa-fw fa-mountain"></i> Clays
+            </a></li>
+            <li><a onclick="setTheme('stones')">
+                <i class="fas fa-fw fa-gem"></i> Stones
+            </a></li>
+            <li><a onclick="setTheme('lofi')">
+                <i class="fas fa-fw fa-headphones"></i> Lo-Fi
+            </a></li>
+            <li><a onclick="setTheme('black')">
+                <i class="fas fa-fw fa-pen-nib"></i> Black
+            </a></li>
+        </ul>
+    </div>
+</div>
+
+<!-- Navigation -->
+<div class="navbar bg-base-200 shadow-lg">
+    <div class="navbar-start">
+        <a class="btn btn-ghost normal-case text-xl" href="/">
+            <i class="fas fa-network-wired mr-2"></i>
+            Mesh Watchy
+        </a>
+    </div>
+    <div class="navbar-center">
+        <div class="tabs tabs-lifted">
+            <a class="tab tab-active" href="/" data-nav="dashboard">
+                <i class="fas fa-tachometer-alt mr-1"></i>
+                Dashboard
+            </a>
+            <a class="tab" href="/map" data-nav="map">
+                <i class="fas fa-map-marked-alt mr-1"></i>
+                Map
+            </a>
+            <a class="tab" href="/nodes" data-nav="nodes">
+                <i class="fas fa-broadcast-tower mr-1"></i>
+                Nodes
+            </a>
+            <a class="tab" href="/messages" data-nav="messages">
+                <i class="fas fa-comments mr-1"></i>
+                Messages
+            </a>
+            <a class="tab" href="/webhooks" data-nav="webhooks">
+                <i class="fas fa-link mr-1"></i>
+                Webhooks
+            </a>
+        </div>
+    </div>
+    <div class="navbar-end">
+        <div class="flex items-center gap-2">
+            <!-- Connection status indicator -->
+            <div class="indicator">
+                <span class="indicator-item badge badge-success pulse-dot"></span>
+                <div class="btn btn-ghost btn-circle btn-sm" title="System Status">
+                    <i class="fas fa-circle text-success"></i>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<main class="px-4 py-8 sm:px-6 lg:px-8">
+    <div class="mx-auto max-w-7xl">
+        {% block content %}
+        {% endblock %}
+    </div>
+</main>
+
+<!-- Footer -->
+<footer class="footer footer-center p-4 bg-base-200 text-base-content mt-8">
+    <div>
+        <p>
+            <i class="fas fa-satellite-dish mr-1"></i>
+            Mesh Watchy - Monitoring Meshtastic Networks
+            <span class="text-base-content/60 ml-2">
+                Built with ❤️ using Rust + MiniJinja + DaisyUI
+            </span>
+        </p>
+    </div>
+</footer>
+
+<div class="hidden">
+    <div class="text-cool bg-cool border-cool btn-cool"></div>
+    <div class="text-cyan bg-cyan border-cyan"></div>
+    <div class="text-good bg-good border-good"></div>
+    <div class="text-lime bg-lime border-lime"></div>
+    <div class="text-warm bg-warm border-warm"></div>
+    <div class="text-hot bg-hot border-hot"></div>
+    <div class="text-danger bg-danger border-danger"></div>
+    <div class="text-critical bg-critical border-critical"></div>
+</div>
+
+<script>
+    // Set active tab based on current page
+    document.addEventListener('DOMContentLoaded', () => {
+        const currentPath = window.location.pathname;
+        const tabs = document.querySelectorAll('.tab[data-nav]');
+        
+        tabs.forEach(tab => {
+            tab.classList.remove('tab-active');
+            const nav = tab.getAttribute('data-nav');
+            
+            if ((currentPath === '/' && nav === 'dashboard') ||
+                (currentPath.includes('/map') && nav === 'map') ||
+                (currentPath.includes('/nodes') && nav === 'nodes') ||
+                (currentPath.includes('/messages') && nav === 'messages') ||
+                (currentPath.includes('/webhooks') && nav === 'webhooks')) {
+                tab.classList.add('tab-active');
+            }
+        });
+    });
+</script>
+
+</body>
+</html>

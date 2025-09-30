@@ -1,0 +1,489 @@
+{% extends "root.html" %}
+
+{% block content %}
+    <div class="min-h-screen">
+        <header class="mb-8">
+            <h1 class="text-4xl font-bold mb-2">📡 Network Nodes</h1>
+            <p class="text-base-content/60">Monitor all discovered nodes in the mesh network</p>
+        </header>
+
+        <main>
+            <!-- Node Statistics -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div class="stat bg-base-100 shadow-lg rounded-xl">
+                    <div class="stat-title">Total Nodes</div>
+                    <div class="stat-value text-primary">{{ nodes|length }}</div>
+                    <div class="stat-desc">Discovered in network</div>
+                </div>
+                
+                <div class="stat bg-base-100 shadow-lg rounded-xl">
+                    <div class="stat-title">Active Nodes</div>
+                    <div class="stat-value text-good">{{ nodes|selectattr("is_active")|list|length }}</div>
+                    <div class="stat-desc">Recently active</div>
+                </div>
+                
+                <div class="stat bg-base-100 shadow-lg rounded-xl">
+                    <div class="stat-title">With Position</div>
+                    <div class="stat-value text-info">{{ nodes|selectattr("has_position")|list|length }}</div>
+                    <div class="stat-desc">GPS-enabled nodes</div>
+                </div>
+            </div>
+
+            <!-- Nodes Table -->
+            <div class="card bg-base-100 shadow-lg">
+                <div class="card-body">
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="card-title">Node Directory</h3>
+                        <button class="btn btn-ghost btn-sm" onclick="location.reload()">
+                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd"/>
+                            </svg>
+                            Refresh
+                        </button>
+                    </div>
+                    
+                    <div class="overflow-x-auto">
+                        <table class="table table-zebra w-full">
+                            <thead>
+                                <tr>
+                                    <th>Node ID</th>
+                                    <th>Name</th>
+                                    <th>Hardware</th>
+                                    <th>Status</th>
+                                    <th>Position</th>
+                                    <th>Battery</th>
+                                    <th>Last Seen</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for node in nodes %}
+                                <tr>
+                                    <td>
+                                        <div class="font-mono text-sm">{{ node.node_id }}</div>
+                                        {% if node.user_id %}
+                                            <div class="text-xs text-base-content/50">User: {{ node.user_id }}</div>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="flex flex-col">
+                                            {% if node.long_name %}
+                                                <div class="font-semibold">{{ node.long_name }}</div>
+                                            {% endif %}
+                                            {% if node.short_name %}
+                                                <div class="text-sm text-base-content/70">{{ node.short_name }}</div>
+                                            {% endif %}
+                                            {% if not node.long_name and not node.short_name %}
+                                                <div class="text-base-content/50">Unknown</div>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                    <td>
+                                        {% if node.hardware_model %}
+                                            <div class="badge badge-outline">{{ node.hardware_model }}</div>
+                                        {% else %}
+                                            <span class="text-base-content/50">Unknown</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if node.is_active %}
+                                            <span class="badge badge-success gap-1">
+                                                <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                                    <circle cx="10" cy="10" r="8"/>
+                                                </svg>
+                                                Active
+                                            </span>
+                                        {% else %}
+                                            <span class="badge badge-neutral gap-1">
+                                                <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                                    <circle cx="10" cy="10" r="8"/>
+                                                </svg>
+                                                Inactive
+                                            </span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if node.has_position %}
+                                            <span class="badge badge-info">GPS</span>
+                                        {% else %}
+                                            <span class="text-base-content/50">No GPS</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if node.battery_level %}
+                                            <div class="flex items-center gap-2">
+                                                <div class="w-8 h-2 bg-base-300 rounded-full overflow-hidden">
+                                                    <div class="h-full bg-success transition-all duration-300"
+                                                         style="width: {{ node.battery_level }}%"></div>
+                                                </div>
+                                                <span class="text-xs">{{ node.battery_level }}%</span>
+                                            </div>
+                                        {% else %}
+                                            <span class="text-base-content/50">Unknown</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="text-sm" data-timestamp="{{ node.last_seen }}">{{ node.last_seen|timeago }}</div>
+                                        {% if node.first_seen %}
+                                            <div class="text-xs text-base-content/50" data-timestamp="{{ node.first_seen }}">First: {{ node.first_seen|timeago }}</div>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="flex gap-1">
+                                            {% if node.has_position %}
+                                                <a href="/map?focus={{ node.node_id }}" 
+                                                   class="btn btn-xs btn-outline btn-info"
+                                                   title="View on map">
+                                                    📍
+                                                </a>
+                                            {% endif %}
+                                            <button class="btn btn-xs btn-outline" 
+                                                    onclick="showNodeDetails('{{ node.node_id }}')"
+                                                    title="Node details">
+                                                ℹ️
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {% if nodes|length == 0 %}
+                        <div class="text-center py-12">
+                            <div class="text-base-content/50 mb-4">
+                                <svg class="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                          d="M9.172 16.172a4 4 0 015.656 0M9 12h6m-6-4h6m2 5.291A7.962 7.962 0 0112 15c-2.34 0-4.29-1.009-5.674-2.64"/>
+                                </svg>
+                            </div>
+                            <h4 class="text-lg font-semibold mb-2">No nodes discovered yet</h4>
+                            <p class="text-base-content/60">Nodes will appear here as they communicate on the mesh network.</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Node Details Modal -->
+    <div id="nodeModal" class="modal">
+        <div class="modal-box">
+            <h3 class="font-bold text-lg mb-4">Node Details</h3>
+            <div id="nodeDetails">
+                <!-- Details will be populated by JavaScript -->
+            </div>
+            <div class="modal-action">
+                <button class="btn btn-ghost" onclick="closeModal()">Close</button>
+            </div>
+        </div>
+        <div class="modal-backdrop" onclick="closeModal()"></div>
+    </div>
+
+    <script>
+        // Format timestamp as "n minutes ago" like our Jinja filter
+        function formatTimeAgo(timestamp) {
+            const now = Math.floor(Date.now() / 1000);
+            const diff = now - timestamp;
+            
+            if (diff < 0) return "in the future";
+            
+            if (diff < 60) {
+                return `${diff} ${diff === 1 ? 'second' : 'seconds'} ago`;
+            } else if (diff < 3600) {
+                const minutes = Math.floor(diff / 60);
+                return `${minutes} ${minutes === 1 ? 'minute' : 'minutes'} ago`;
+            } else if (diff < 86400) {
+                const hours = Math.floor(diff / 3600);
+                return `${hours} ${hours === 1 ? 'hour' : 'hours'} ago`;
+            } else if (diff < 2592000) { // 30 days
+                const days = Math.floor(diff / 86400);
+                return `${days} ${days === 1 ? 'day' : 'days'} ago`;
+            } else if (diff < 31536000) { // 365 days
+                const months = Math.floor(diff / 2592000);
+                return `${months} ${months === 1 ? 'month' : 'months'} ago`;
+            } else {
+                const years = Math.floor(diff / 31536000);
+                return `${years} ${years === 1 ? 'year' : 'years'} ago`;
+            }
+        }
+
+        async function showNodeDetails(nodeId) {
+            // Find node data
+            const nodes = {{ nodes|tojson }};
+            const node = nodes.find(n => n.node_id === nodeId);
+            
+            if (!node) return;
+            
+            // Show basic details first
+            let details = `
+                <div class="space-y-4">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <h4 class="font-semibold text-base-content/70">Identification</h4>
+                            <div class="mt-2 space-y-1">
+                                <div><strong>Node ID:</strong> <code class="text-sm">${node.node_id}</code></div>
+                                ${node.user_id ? `<div><strong>User ID:</strong> ${node.user_id}</div>` : ''}
+                                ${node.long_name ? `<div><strong>Long Name:</strong> ${node.long_name}</div>` : ''}
+                                ${node.short_name ? `<div><strong>Short Name:</strong> ${node.short_name}</div>` : ''}
+                            </div>
+                        </div>
+                        
+                        <div>
+                            <h4 class="font-semibold text-base-content/70">Hardware</h4>
+                            <div class="mt-2 space-y-1">
+                                ${node.hardware_model ? `<div><strong>Model:</strong> ${node.hardware_model}</div>` : ''}
+                                ${node.firmware_version ? `<div><strong>Firmware:</strong> ${node.firmware_version}</div>` : ''}
+                                ${node.battery_level ? `<div><strong>Battery:</strong> ${node.battery_level}%</div>` : ''}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div>
+                        <h4 class="font-semibold text-base-content/70">Activity</h4>
+                        <div class="mt-2 space-y-1">
+                            <div><strong>Status:</strong> ${node.is_active ? '<span class="text-success">Active</span>' : '<span class="text-base-content/50">Inactive</span>'}</div>
+                            <div><strong>First Seen:</strong> ${node.first_seen ? formatTimeAgo(node.first_seen) : 'Unknown'}</div>
+                            <div><strong>Last Seen:</strong> ${formatTimeAgo(node.last_seen)}</div>
+                            <div><strong>Has Position:</strong> ${node.has_position ? '<span class="text-info">Yes</span>' : '<span class="text-base-content/50">No</span>'}</div>
+                        </div>
+                    </div>
+                    
+                    <div id="telemetrySection">
+                        <h4 class="font-semibold text-base-content/70">Battery History</h4>
+                        <div class="mt-2">
+                            <div class="flex items-center gap-2">
+                                <span class="loading loading-spinner loading-sm"></span>
+                                <span>Loading telemetry data...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById('nodeDetails').innerHTML = details;
+            document.getElementById('nodeModal').classList.add('modal-open');
+            
+            // Fetch telemetry data
+            try {
+                const response = await fetch(`/api/telemetry/${encodeURIComponent(nodeId)}`);
+                if (response.ok) {
+                    const telemetryData = await response.json();
+                    updateTelemetrySection(telemetryData);
+                } else {
+                    document.getElementById('telemetrySection').innerHTML = `
+                        <h4 class="font-semibold text-base-content/70">Battery History</h4>
+                        <div class="mt-2">
+                            <span class="text-base-content/50">No telemetry data available</span>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('Failed to fetch telemetry data:', error);
+                document.getElementById('telemetrySection').innerHTML = `
+                    <h4 class="font-semibold text-base-content/70">Battery History</h4>
+                    <div class="mt-2">
+                        <span class="text-error">Failed to load telemetry data</span>
+                    </div>
+                `;
+            }
+        }
+        
+        function updateTelemetrySection(telemetryData) {
+            if (!telemetryData || telemetryData.length === 0) {
+                document.getElementById('telemetrySection').innerHTML = `
+                    <h4 class="font-semibold text-base-content/70">Battery History</h4>
+                    <div class="mt-2">
+                        <span class="text-base-content/50">No telemetry data available</span>
+                    </div>
+                `;
+                return;
+            }
+            
+            // Get the latest entry (most recent telemetry)
+            const latest = telemetryData[telemetryData.length - 1];
+            
+            let telemetryHtml = `
+                <h4 class="font-semibold text-base-content/70">Battery History</h4>
+                <div class="mt-2 space-y-3">
+            `;
+            
+            // Show battery time series chart
+            if (latest.battery_chart && latest.battery_chart.trim() && latest.battery_chart !== '────────────────────') {
+                telemetryHtml += `
+                    <div class="bg-base-200 p-3 rounded-lg">
+                        <div class="text-sm font-medium mb-2">Battery Level Over Time</div>
+                        <div class="font-mono text-2xl tracking-wider mb-2" style="line-height: 1.2; letter-spacing: 0.1em;">
+                            ${latest.battery_chart}
+                        </div>
+                        <div class="text-xs text-base-content/60 space-y-1">
+                            <div>Each character represents a battery reading over time</div>
+                            <div>▁▂▃▄▅▆▇█ = 0-12% to 88-100% | 🔌 = Charging | ─ = No data</div>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            // Show latest telemetry values
+            telemetryHtml += `
+                    <div>
+                        <div class="text-sm font-medium mb-2">Latest Telemetry</div>
+                        <div class="grid grid-cols-2 gap-4 text-sm">
+            `;
+            
+            if (latest.battery_level !== null) {
+                telemetryHtml += `
+                            <div>
+                                <span class="text-base-content/70">Battery:</span>
+                                <span class="font-medium">${latest.battery_level}%</span>
+                            </div>
+                `;
+            }
+            
+            if (latest.voltage !== null) {
+                telemetryHtml += `
+                            <div>
+                                <span class="text-base-content/70">Voltage:</span>
+                                <span class="font-medium">${latest.voltage.toFixed(2)}V</span>
+                            </div>
+                `;
+            }
+            
+            if (latest.air_util_tx !== null) {
+                telemetryHtml += `
+                            <div>
+                                <span class="text-base-content/70">Air Util TX:</span>
+                                <span class="font-medium">${latest.air_util_tx.toFixed(1)}%</span>
+                            </div>
+                `;
+            }
+            
+            if (latest.channel_utilization !== null) {
+                telemetryHtml += `
+                            <div>
+                                <span class="text-base-content/70">Channel Util:</span>
+                                <span class="font-medium">${latest.channel_utilization.toFixed(1)}%</span>
+                            </div>
+                `;
+            }
+            
+            if (latest.uptime_seconds !== null) {
+                const uptime = formatUptime(latest.uptime_seconds);
+                telemetryHtml += `
+                            <div>
+                                <span class="text-base-content/70">Uptime:</span>
+                                <span class="font-medium">${uptime}</span>
+                            </div>
+                `;
+            }
+            
+            telemetryHtml += `
+                            <div>
+                                <span class="text-base-content/70">Last Update:</span>
+                                <span class="font-medium">${new Date(latest.timestamp * 1000).toLocaleString()}</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="text-xs text-base-content/50">
+                        Showing ${telemetryData.length} telemetry record${telemetryData.length !== 1 ? 's' : ''}
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById('telemetrySection').innerHTML = telemetryHtml;
+        }
+        
+        function formatUptime(seconds) {
+            if (seconds < 60) return `${seconds}s`;
+            if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
+            if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m`;
+            return `${Math.floor(seconds / 86400)}d ${Math.floor((seconds % 86400) / 3600)}h`;
+        }
+        
+        function closeModal() {
+            document.getElementById('nodeModal').classList.remove('modal-open');
+        }
+        
+        // WebSocket connection for real-time updates
+        function initializeWebSocket() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/ws`;
+            
+            let ws = null;
+            let reconnectInterval = null;
+            
+            function connect() {
+                try {
+                    ws = new WebSocket(wsUrl);
+                    
+                    ws.onopen = function() {
+                        console.log('WebSocket connected');
+                        clearInterval(reconnectInterval);
+                    };
+                    
+                    ws.onmessage = function(event) {
+                        try {
+                            const data = JSON.parse(event.data);
+                            handleWebSocketMessage(data);
+                        } catch (e) {
+                            console.error('Failed to parse WebSocket message:', e);
+                        }
+                    };
+                    
+                    ws.onclose = function() {
+                        console.log('WebSocket disconnected, attempting to reconnect...');
+                        setTimeout(connect, 5000);
+                    };
+                    
+                    ws.onerror = function(error) {
+                        console.error('WebSocket error:', error);
+                        ws.close();
+                    };
+                    
+                } catch (e) {
+                    console.error('Failed to create WebSocket connection:', e);
+                    setTimeout(connect, 5000);
+                }
+            }
+            
+            function handleWebSocketMessage(data) {
+                switch (data.type) {
+                    case 'new_message':
+                        console.log('New message received:', data.message);
+                        // Update last seen times dynamically
+                        updateLastSeenTimes();
+                        break;
+                    case 'node_update':
+                        console.log('Node update received:', data.node);
+                        updateLastSeenTimes();
+                        break;
+                    case 'network_stats':
+                        console.log('Network stats update:', data.overview);
+                        break;
+                    default:
+                        console.log('Unknown WebSocket message type:', data.type);
+                }
+            }
+            
+            function updateLastSeenTimes() {
+                // Update all timeago elements on the page
+                const timeElements = document.querySelectorAll('[data-timestamp]');
+                timeElements.forEach(element => {
+                    const timestamp = parseInt(element.dataset.timestamp);
+                    if (timestamp) {
+                        element.textContent = formatTimeAgo(timestamp);
+                    }
+                });
+            }
+            
+            connect();
+        }
+        
+        // Initialize WebSocket when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeWebSocket();
+        });
+    </script>
+{% endblock %}

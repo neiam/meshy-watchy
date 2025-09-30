@@ -1,0 +1,314 @@
+{% extends "root.html" %}
+
+{% block content %}
+    <div class="min-h-screen">
+        <header class="mb-8">
+            <h1 class="text-4xl font-bold mb-2">💬 Text Messages</h1>
+            <p class="text-base-content/60">Real-time Text Messages from the Mesh Network</p>
+        </header>
+
+        <main>
+            <!-- Messages Stats -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div class="card bg-base-100 shadow-lg">
+                    <div class="card-body">
+                        <h3 class="card-title text-lg">Total Messages</h3>
+                        <p class="text-3xl font-bold text-primary" id="messageCount">{{ text_messages|length }}</p>
+                    </div>
+                </div>
+                
+                <div class="card bg-base-100 shadow-lg">
+                    <div class="card-body">
+                        <h3 class="card-title text-lg">Active Senders</h3>
+                        <p class="text-3xl font-bold text-info" id="activeSenders">
+                            {{ text_messages | map(attribute='from_node') | unique | list | length }}
+                        </p>
+                    </div>
+                </div>
+                
+                <div class="card bg-base-100 shadow-lg">
+                    <div class="card-body">
+                        <h3 class="card-title text-lg">Recent Activity</h3>
+                        <p class="text-3xl font-bold text-success">
+                            {% if text_messages %}
+                                {{ text_messages[0].timestamp }}
+                            {% else %}
+                                No activity
+                            {% endif %}
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Messages List -->
+            <div class="card bg-base-100 shadow-lg">
+                <div class="card-body">
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="card-title text-xl">Recent Messages</h3>
+                        <div class="flex gap-2">
+                            <button class="btn btn-outline btn-sm" id="refreshBtn">
+                                <i class="fas fa-sync-alt"></i>
+                                Refresh
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="loading hidden" id="loading">
+                        <div class="text-center py-8">
+                            <span class="loading loading-spinner loading-lg text-primary"></span>
+                            <p class="mt-2 text-base-content/60">Loading messages...</p>
+                        </div>
+                    </div>
+
+                    <div id="messagesContainer">
+                        {% if text_messages %}
+                            <div class="space-y-4">
+                                {% for message in text_messages %}
+                                <div class="message-card border-l-4 border-primary bg-base-200 p-4 rounded-r-lg" 
+                                     data-timestamp="{{ message.timestamp }}">
+                                    <div class="flex justify-between items-start mb-3">
+                                        <div class="flex items-center gap-2">
+                                            <span class="font-mono text-sm bg-base-300 px-2 py-1 rounded">
+                                                {{ message.from_node }}
+                                            </span>
+                                            {% if message.to_node %}
+                                                <i class="fas fa-arrow-right text-base-content/60"></i>
+                                                <span class="font-mono text-sm bg-base-300 px-2 py-1 rounded">
+                                                    {{ message.to_node }}
+                                                </span>
+                                            {% else %}
+                                                <div class="badge badge-outline">broadcast</div>
+                                            {% endif %}
+                                        </div>
+                                        <div class="text-sm text-base-content/60 flex items-center gap-2">
+                                            <span class="timestamp" data-timestamp="{{ message.timestamp }}">
+                                                {{ message.timestamp }}
+                                            </span>
+                                            {% if message.gateway %}
+                                                <div class="badge badge-secondary">{{ message.gateway }}</div>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="message-text bg-base-100 p-3 rounded-lg mb-3">
+                                        <p class="text-base leading-relaxed">{{ message.text }}</p>
+                                    </div>
+                                    
+                                    <div class="flex gap-2 text-xs">
+                                        {% if message.channel %}
+                                            <div class="badge badge-ghost">Ch {{ message.channel }}</div>
+                                        {% endif %}
+                                        {% if message.rssi %}
+                                            <div class="badge {% if message.rssi > -70 %}badge-success{% elif message.rssi > -90 %}badge-warning{% else %}badge-error{% endif %}">
+                                                {{ message.rssi }} dBm
+                                            </div>
+                                        {% endif %}
+                                        {% if message.snr %}
+                                            <div class="badge badge-info">
+                                                SNR: {{ message.snr }} dB
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <div class="text-center py-16">
+                                <i class="fas fa-comments text-6xl text-base-content/20 mb-4"></i>
+                                <h4 class="text-xl font-semibold mb-2">No Messages Yet</h4>
+                                <p class="text-base-content/60">No text messages have been received from the mesh network.</p>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // WebSocket connection for real-time updates
+        let socket = null;
+        let reconnectAttempts = 0;
+        const maxReconnectAttempts = 5;
+
+        function connectWebSocket() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/ws`;
+            
+            socket = new WebSocket(wsUrl);
+            
+            socket.onopen = function() {
+                console.log('WebSocket connected');
+                reconnectAttempts = 0;
+            };
+            
+            socket.onmessage = function(event) {
+                try {
+                    const data = JSON.parse(event.data);
+                    handleWebSocketMessage(data);
+                } catch (e) {
+                    console.error('Failed to parse WebSocket message:', e);
+                }
+            };
+            
+            socket.onclose = function() {
+                console.log('WebSocket disconnected');
+                if (reconnectAttempts < maxReconnectAttempts) {
+                    setTimeout(() => {
+                        reconnectAttempts++;
+                        connectWebSocket();
+                    }, 1000 * reconnectAttempts);
+                }
+            };
+            
+            socket.onerror = function(error) {
+                console.error('WebSocket error:', error);
+            };
+        }
+
+        function handleWebSocketMessage(data) {
+            if (data.type === 'new_message' && data.message.message_type === 'TEXT') {
+                // Refresh messages when new text message arrives
+                loadMessages();
+            }
+        }
+
+        // Format time ago
+        function formatTimeAgo(timestamp) {
+            const now = Date.now() / 1000;
+            const diff = now - timestamp;
+            
+            if (diff < 60) return 'just now';
+            if (diff < 3600) return Math.floor(diff / 60) + ' minutes ago';
+            if (diff < 86400) return Math.floor(diff / 3600) + ' hours ago';
+            if (diff < 2592000) return Math.floor(diff / 86400) + ' days ago';
+            return new Date(timestamp * 1000).toLocaleDateString();
+        }
+
+        // Update all timestamps
+        function updateTimestamps() {
+            const timestamps = document.querySelectorAll('.timestamp');
+            timestamps.forEach(element => {
+                const timestamp = parseFloat(element.getAttribute('data-timestamp'));
+                element.textContent = formatTimeAgo(timestamp);
+            });
+        }
+
+        // Load messages from API
+        async function loadMessages() {
+            const loading = document.getElementById('loading');
+            const container = document.getElementById('messagesContainer');
+            
+            try {
+                loading.classList.remove('hidden');
+                const response = await fetch('/api/messages?limit=100');
+                const messages = await response.json();
+                
+                if (messages.length === 0) {
+                    container.innerHTML = `
+                        <div class="text-center py-16">
+                            <i class="fas fa-comments text-6xl text-base-content/20 mb-4"></i>
+                            <h4 class="text-xl font-semibold mb-2">No Messages Yet</h4>
+                            <p class="text-base-content/60">No text messages have been received from the mesh network.</p>
+                        </div>
+                    `;
+                } else {
+                    container.innerHTML = `
+                        <div class="space-y-4">
+                            ${messages.map(message => `
+                                <div class="message-card border-l-4 border-primary bg-base-200 p-4 rounded-r-lg" 
+                                     data-timestamp="${new Date(message.timestamp).getTime() / 1000}">
+                                    <div class="flex justify-between items-start mb-3">
+                                        <div class="flex items-center gap-2">
+                                            <span class="font-mono text-sm bg-base-300 px-2 py-1 rounded">
+                                                ${message.from_node}
+                                            </span>
+                                            ${message.to_node ? 
+                                                `<i class="fas fa-arrow-right text-base-content/60"></i>
+                                                 <span class="font-mono text-sm bg-base-300 px-2 py-1 rounded">
+                                                    ${message.to_node}
+                                                 </span>` :
+                                                '<div class="badge badge-outline">broadcast</div>'
+                                            }
+                                        </div>
+                                        <div class="text-sm text-base-content/60 flex items-center gap-2">
+                                            <span class="timestamp" data-timestamp="${new Date(message.timestamp).getTime() / 1000}">
+                                                ${formatTimeAgo(new Date(message.timestamp).getTime() / 1000)}
+                                            </span>
+                                            ${message.gateway ? 
+                                                `<div class="badge badge-secondary">${message.gateway}</div>` : 
+                                                ''
+                                            }
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="message-text bg-base-100 p-3 rounded-lg mb-3">
+                                        <p class="text-base leading-relaxed">${escapeHtml(message.text)}</p>
+                                    </div>
+                                    
+                                    <div class="flex gap-2 text-xs">
+                                        ${message.channel ? 
+                                            `<div class="badge badge-ghost">Ch ${message.channel}</div>` : 
+                                            ''
+                                        }
+                                        ${message.rssi ? `
+                                            <div class="badge ${
+                                                message.rssi > -70 ? 'badge-success' : 
+                                                message.rssi > -90 ? 'badge-warning' : 'badge-error'
+                                            }">
+                                                ${message.rssi} dBm
+                                            </div>
+                                        ` : ''}
+                                        ${message.snr ? `
+                                            <div class="badge badge-info">
+                                                SNR: ${message.snr.toFixed(1)} dB
+                                            </div>
+                                        ` : ''}
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    `;
+                }
+                
+                // Update message count and active senders
+                document.getElementById('messageCount').textContent = messages.length;
+                const uniqueSenders = [...new Set(messages.map(m => m.from_node))];
+                document.getElementById('activeSenders').textContent = uniqueSenders.length;
+                
+            } catch (error) {
+                console.error('Failed to load messages:', error);
+                container.innerHTML = `
+                    <div class="alert alert-error">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <div>
+                            <h3 class="font-bold">Error Loading Messages</h3>
+                            <div class="text-xs">Failed to load messages. Please try refreshing the page.</div>
+                        </div>
+                    </div>
+                `;
+            } finally {
+                loading.classList.add('hidden');
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Event listeners
+        document.getElementById('refreshBtn').addEventListener('click', () => {
+            loadMessages();
+        });
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            connectWebSocket();
+            
+            // Update timestamps every minute
+            setInterval(updateTimestamps, 60000);
+        });
+    </script>
+{% endblock %}

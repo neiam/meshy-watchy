@@ -1,0 +1,533 @@
+{% extends "root.html" %}
+
+{% block content %}
+    <div class="min-h-screen">
+        <header class="mb-8">
+            <h1 class="text-4xl font-bold mb-2">🔗 Webhook Management</h1>
+            <p class="text-base-content/60">Configure external webhook endpoints for real-time notifications</p>
+        </header>
+
+        <main>
+            <!-- Webhook Status Overview -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div class="stat bg-base-100 shadow-lg rounded-xl">
+                    <div class="stat-title">Total Webhooks</div>
+                    <div class="stat-value text-primary">{{ total_webhooks }}</div>
+                    <div class="stat-desc">{{ enabled_webhooks }} enabled</div>
+                </div>
+                <div class="stat bg-base-100 shadow-lg rounded-xl">
+                    <div class="stat-title">Messages Sent</div>
+                    <div class="stat-value text-success">{{ total_sent }}</div>
+                    <div class="stat-desc">Successfully delivered</div>
+                </div>
+                <div class="stat bg-base-100 shadow-lg rounded-xl">
+                    <div class="stat-title">Failed Deliveries</div>
+                    <div class="stat-value text-error">{{ total_failed }}</div>
+                    <div class="stat-desc">Delivery failures</div>
+                </div>
+            </div>
+
+            <!-- Webhook List -->
+            <div class="card bg-base-100 shadow-lg">
+                <div class="card-body">
+                    <div class="flex justify-between items-center mb-6">
+                        <div>
+                            <h2 class="card-title text-2xl">Configured Webhooks</h2>
+                            <p class="text-base-content/60 mt-2">Manage webhook endpoints for real-time notifications</p>
+                        </div>
+                        <button class="btn btn-primary" onclick="showAddWebhookModal()">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                            </svg>
+                            Add Webhook
+                        </button>
+                    </div>
+
+                    {% if webhooks|length > 0 %}
+                        <div class="overflow-x-auto">
+                            <table class="table table-zebra w-full">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>URL</th>
+                                        <th>Message Types</th>
+                                        <th>Status</th>
+                                        <th>Statistics</th>
+                                        <th>Last Activity</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for webhook in webhooks %}
+                                    <tr>
+                                        <td class="font-semibold">{{ webhook.name }}</td>
+                                        <td class="font-mono text-sm max-w-xs truncate" title="{{ webhook.url }}">
+                                            {{ webhook.url }}
+                                        </td>
+                                        <td>
+                                            {% if webhook.message_types|length > 0 %}
+                                                <div class="flex flex-wrap gap-1">
+                                                    {% for msg_type in webhook.message_types %}
+                                                        <span class="badge badge-outline badge-xs">{{ msg_type }}</span>
+                                                    {% endfor %}
+                                                </div>
+                                            {% else %}
+                                                <span class="badge badge-info badge-sm">All Types</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            {% if webhook.enabled %}
+                                                <span class="badge badge-success gap-1">
+                                                    <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                                        <circle cx="10" cy="10" r="8"/>
+                                                    </svg>
+                                                    Enabled
+                                                </span>
+                                            {% else %}
+                                                <span class="badge badge-error gap-1">
+                                                    <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                                                        <circle cx="10" cy="10" r="8"/>
+                                                    </svg>
+                                                    Disabled
+                                                </span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <div class="text-sm">
+                                                <div class="text-success">✓ {{ webhook.total_sent }}</div>
+                                                <div class="text-error">✗ {{ webhook.total_failed }}</div>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            {% if webhook.last_success %}
+                                                <div class="text-xs text-success">
+                                                    Success: {{ webhook.last_success }}
+                                                </div>
+                                            {% endif %}
+                                            {% if webhook.last_error %}
+                                                <div class="text-xs text-error">
+                                                    Error: {{ webhook.last_error }}
+                                                </div>
+                                            {% endif %}
+                                            {% if not webhook.last_success and not webhook.last_error %}
+                                                <span class="text-base-content/50 text-xs">Never used</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>
+                                            <div class="flex gap-1">
+                                                <button class="btn btn-xs btn-outline btn-info" 
+                                                        onclick="testWebhook('{{ webhook.name }}')"
+                                                        title="Test webhook">
+                                                    🧪
+                                                </button>
+                                                <button class="btn btn-xs btn-outline" 
+                                                        onclick="toggleWebhook('{{ webhook.name }}')"
+                                                        title="Toggle enabled/disabled">
+                                                    {% if webhook.enabled %}⏸️{% else %}▶️{% endif %}
+                                                </button>
+                                                <button class="btn btn-xs btn-outline btn-secondary" 
+                                                        onclick="editWebhook('{{ webhook.name }}')"
+                                                        title="Edit webhook">
+                                                    ✏️
+                                                </button>
+                                                <button class="btn btn-xs btn-outline btn-error" 
+                                                        onclick="deleteWebhook('{{ webhook.name }}')"
+                                                        title="Delete webhook">
+                                                    🗑️
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-12">
+                            <div class="text-base-content/50 mb-4">
+                                <svg class="w-16 h-16 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                                          d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"/>
+                                </svg>
+                            </div>
+                            <h4 class="text-lg font-semibold mb-2">No webhooks configured</h4>
+                            <p class="text-base-content/60 mb-4">Add webhook endpoints to receive real-time notifications.</p>
+                            <button class="btn btn-primary" onclick="showAddWebhookModal()">Add Your First Webhook</button>
+                        </div>
+                    {% endif %}
+
+                    {% if webhooks|length > 0 %}
+                        <div class="divider"></div>
+                        <div class="flex justify-between items-center">
+                            <button class="btn btn-ghost btn-sm" onclick="location.reload()">
+                                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd"/>
+                                </svg>
+                                Refresh
+                            </button>
+                            <button class="btn btn-warning btn-sm" onclick="resetWebhookStats()">
+                                Reset Statistics
+                            </button>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Add/Edit Webhook Modal -->
+    <div id="webhookModal" class="modal">
+        <div class="modal-box max-w-2xl">
+            <h3 class="font-bold text-lg mb-4">
+                <span id="modalTitle">Add Webhook</span>
+            </h3>
+            
+            <form id="webhookForm" class="space-y-4">
+                <div class="form-control">
+                    <label class="label">
+                        <span class="label-text">Name</span>
+                    </label>
+                    <input type="text" id="webhookName" name="name" placeholder="e.g., Discord Alert" 
+                           class="input input-bordered w-full" required>
+                </div>
+                
+                <div class="form-control">
+                    <label class="label">
+                        <span class="label-text">Webhook URL</span>
+                    </label>
+                    <input type="url" id="webhookUrl" name="url" placeholder="https://discord.com/api/webhooks/..." 
+                           class="input input-bordered w-full" required>
+                </div>
+                
+                <div class="form-control">
+                    <label class="label">
+                        <span class="label-text">Message Types (leave empty for all)</span>
+                    </label>
+                    <div class="flex flex-wrap gap-2 mt-2">
+                        <label class="cursor-pointer label">
+                            <input type="checkbox" name="message_types" value="position" class="checkbox checkbox-sm">
+                            <span class="label-text ml-2">Position</span>
+                        </label>
+                        <label class="cursor-pointer label">
+                            <input type="checkbox" name="message_types" value="nodeinfo" class="checkbox checkbox-sm">
+                            <span class="label-text ml-2">Node Info</span>
+                        </label>
+                        <label class="cursor-pointer label">
+                            <input type="checkbox" name="message_types" value="telemetry" class="checkbox checkbox-sm">
+                            <span class="label-text ml-2">Telemetry</span>
+                        </label>
+                        <label class="cursor-pointer label">
+                            <input type="checkbox" name="message_types" value="text" class="checkbox checkbox-sm">
+                            <span class="label-text ml-2">Text Messages</span>
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="form-control">
+                    <label class="label">
+                        <span class="label-text">Device Filter (leave empty for all devices)</span>
+                        <span class="label-text-alt">Specify device IDs in hex format (e.g., 2e268b50)</span>
+                    </label>
+                    <input type="text" id="webhookDevices" name="devices" placeholder="2e268b50, 12345678..." 
+                           class="input input-bordered w-full" title="Comma-separated device IDs in hex format without ! prefix">
+                    <div class="label">
+                        <span class="label-text-alt">Separate multiple device IDs with commas</span>
+                        <span class="label-text-alt">
+                            <button type="button" class="btn btn-xs btn-ghost" onclick="loadAvailableDevices()">
+                                Load Available Devices
+                            </button>
+                        </span>
+                    </div>
+                    <div id="availableDevices" class="mt-2 hidden">
+                        <!-- Available devices will be populated here -->
+                    </div>
+                </div>
+                
+                <div class="form-control">
+                    <label class="cursor-pointer label">
+                        <span class="label-text">Enabled</span>
+                        <input type="checkbox" id="webhookEnabled" name="enabled" class="toggle toggle-primary" checked>
+                    </label>
+                </div>
+                
+                <div class="modal-action">
+                    <button type="button" class="btn btn-ghost" onclick="closeWebhookModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">
+                        <span id="submitButton">Add Webhook</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+        <div class="modal-backdrop" onclick="closeWebhookModal()"></div>
+    </div>
+
+    <!-- Test Result Modal -->
+    <div id="testModal" class="modal">
+        <div class="modal-box">
+            <h3 class="font-bold text-lg mb-4">Webhook Test Result</h3>
+            <div id="testResult" class="space-y-4">
+                <!-- Test result will be populated here -->
+            </div>
+            <div class="modal-action">
+                <button class="btn btn-ghost" onclick="closeTestModal()">Close</button>
+            </div>
+        </div>
+        <div class="modal-backdrop" onclick="closeTestModal()"></div>
+    </div>
+
+    <script>
+        let currentWebhookName = null;
+        
+        function showAddWebhookModal() {
+            currentWebhookName = null;
+            document.getElementById('modalTitle').textContent = 'Add Webhook';
+            document.getElementById('submitButton').textContent = 'Add Webhook';
+            document.getElementById('webhookForm').reset();
+            document.getElementById('webhookModal').classList.add('modal-open');
+        }
+        
+        function closeWebhookModal() {
+            document.getElementById('webhookModal').classList.remove('modal-open');
+        }
+        
+        function closeTestModal() {
+            document.getElementById('testModal').classList.remove('modal-open');
+        }
+        
+        function editWebhook(name) {
+            currentWebhookName = name;
+            document.getElementById('modalTitle').textContent = 'Edit Webhook';
+            document.getElementById('submitButton').textContent = 'Update Webhook';
+            
+            // Find webhook data and populate form
+            const webhooks = {{ webhooks|tojson }};
+            const webhook = webhooks.find(w => w.name === name);
+            
+            if (webhook) {
+                document.getElementById('webhookName').value = webhook.name;
+                document.getElementById('webhookUrl').value = webhook.url;
+                document.getElementById('webhookEnabled').checked = webhook.enabled;
+                
+                // Set message type checkboxes
+                document.querySelectorAll('input[name="message_types"]').forEach(cb => {
+                    cb.checked = webhook.message_types.includes(cb.value);
+                });
+                
+                // Set devices field (convert array to comma-separated string)
+                const devicesInput = document.getElementById('webhookDevices');
+                if (webhook.devices && webhook.devices.length > 0) {
+                    devicesInput.value = webhook.devices.join(', ');
+                } else {
+                    devicesInput.value = '';
+                }
+            }
+            
+            document.getElementById('webhookModal').classList.add('modal-open');
+        }
+        
+        async function loadAvailableDevices() {
+            try {
+                const response = await fetch('/api/nodes');
+                const nodes = await response.json();
+                
+                if (nodes.length > 0) {
+                    const availableDevicesContainer = document.getElementById('availableDevices');
+                    
+                    const deviceButtons = nodes.map(node => {
+                        const deviceId = node.node_id.replace('!', ''); // Remove ! prefix
+                        const displayName = node.short_name || node.long_name || deviceId;
+                        return `
+                            <button type="button" class="btn btn-xs btn-outline mr-1 mb-1" 
+                                    onclick="addDeviceToFilter('${deviceId}', '${displayName}')">
+                                ${deviceId} (${displayName})
+                            </button>
+                        `;
+                    }).join('');
+                    
+                    availableDevicesContainer.innerHTML = `
+                        <div class="text-sm text-base-content/60 mb-2">Click to add device IDs to filter:</div>
+                        <div class="flex flex-wrap">
+                            ${deviceButtons}
+                        </div>
+                    `;
+                    availableDevicesContainer.classList.remove('hidden');
+                } else {
+                    alert('No devices found in the database yet.');
+                }
+            } catch (error) {
+                alert('Failed to load available devices.');
+            }
+        }
+        
+        function addDeviceToFilter(deviceId, displayName) {
+            const devicesInput = document.getElementById('webhookDevices');
+            const currentValue = devicesInput.value.trim();
+            
+            // Check if device is already in the list
+            const currentDevices = currentValue ? currentValue.split(',').map(d => d.trim()) : [];
+            if (currentDevices.includes(deviceId)) {
+                return; // Already added
+            }
+            
+            // Add device to the list
+            if (currentValue) {
+                devicesInput.value = currentValue + ', ' + deviceId;
+            } else {
+                devicesInput.value = deviceId;
+            }
+        }
+        
+        document.getElementById('webhookForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const formData = new FormData(e.target);
+            const messageTypes = formData.getAll('message_types');
+            
+            // Parse devices string into array
+            const devicesString = formData.get('devices') || '';
+            const devices = devicesString
+                .split(',')
+                .map(d => d.trim())
+                .filter(d => d.length > 0);
+            
+            const webhookData = {
+                name: formData.get('name'),
+                url: formData.get('url'),
+                enabled: formData.get('enabled') === 'on',
+                message_types: messageTypes,
+                devices: devices
+            };
+            
+            try {
+                let response;
+                if (currentWebhookName) {
+                    // Update existing webhook
+                    response = await fetch(`/api/webhooks/${currentWebhookName}`, {
+                        method: 'PUT',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify(webhookData)
+                    });
+                } else {
+                    // Add new webhook
+                    response = await fetch('/api/webhooks', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify(webhookData)
+                    });
+                }
+                
+                if (response.ok) {
+                    closeWebhookModal();
+                    location.reload();
+                } else {
+                    alert('Failed to save webhook. Please try again.');
+                }
+            } catch (error) {
+                alert('Network error. Please try again.');
+            }
+        });
+        
+        async function deleteWebhook(name) {
+            if (!confirm(`Are you sure you want to delete the webhook "${name}"?`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/webhooks/${name}`, {
+                    method: 'DELETE'
+                });
+                
+                if (response.ok) {
+                    location.reload();
+                } else {
+                    alert('Failed to delete webhook. Please try again.');
+                }
+            } catch (error) {
+                alert('Network error. Please try again.');
+            }
+        }
+        
+        async function toggleWebhook(name) {
+            try {
+                const response = await fetch(`/api/webhooks/${name}/toggle`, {
+                    method: 'POST'
+                });
+                
+                if (response.ok) {
+                    location.reload();
+                } else {
+                    alert('Failed to toggle webhook. Please try again.');
+                }
+            } catch (error) {
+                alert('Network error. Please try again.');
+            }
+        }
+        
+        async function testWebhook(name) {
+            // Find webhook data
+            const webhooks = {{ webhooks|tojson }};
+            const webhook = webhooks.find(w => w.name === name);
+            
+            if (!webhook) return;
+            
+            try {
+                const response = await fetch('/api/webhooks/test', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ webhook: webhook })
+                });
+                
+                const result = await response.json();
+                
+                const resultHtml = `
+                    <div class="alert ${result.success ? 'alert-success' : 'alert-error'}">
+                        <div>
+                            <h4 class="font-semibold">${result.success ? 'Test Successful!' : 'Test Failed'}</h4>
+                            <p>${result.message}</p>
+                            ${result.response_time ? `<p class="text-sm">Response time: ${result.response_time}ms</p>` : ''}
+                        </div>
+                    </div>
+                `;
+                
+                document.getElementById('testResult').innerHTML = resultHtml;
+                document.getElementById('testModal').classList.add('modal-open');
+                
+            } catch (error) {
+                document.getElementById('testResult').innerHTML = `
+                    <div class="alert alert-error">
+                        <div>
+                            <h4 class="font-semibold">Test Failed</h4>
+                            <p>Network error occurred while testing webhook.</p>
+                        </div>
+                    </div>
+                `;
+                document.getElementById('testModal').classList.add('modal-open');
+            }
+        }
+        
+        async function resetWebhookStats() {
+            if (!confirm('Are you sure you want to reset all webhook statistics?')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/webhooks/stats/reset', {
+                    method: 'POST'
+                });
+                
+                if (response.ok) {
+                    location.reload();
+                } else {
+                    alert('Failed to reset statistics. Please try again.');
+                }
+            } catch (error) {
+                alert('Network error. Please try again.');
+            }
+        }
+        
+        // Auto-refresh every 30 seconds
+        setInterval(() => {
+            location.reload();
+        }, 30000);
+    </script>
+{% endblock %}

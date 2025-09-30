@@ -1,0 +1,374 @@
+{% extends "root.html" %}
+
+{% block content %}
+    <div class="min-h-screen">
+        <header class="mb-8">
+            <h1 class="text-4xl font-bold mb-2">🗺️ Network Map</h1>
+            <p class="text-base-content/60">Visualize node positions and movement patterns</p>
+        </header>
+
+        <main>
+            <div class="card bg-base-100 shadow-lg mb-6">
+                <div class="card-body">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="card-title">Live Network Map</h3>
+                        
+                        <!-- Device Filter Dropdown -->
+                        <div class="dropdown dropdown-end">
+                            <div tabindex="0" role="button" class="btn btn-ghost btn-sm">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+                                </svg>
+                                Filter Devices
+                                <span id="activeFilterBadge" class="badge badge-primary badge-sm ml-1">0</span>
+                            </div>
+                            <div tabindex="0" class="dropdown-content card card-compact w-80 p-2 shadow bg-base-100 text-base-content border border-base-300">
+                                <div class="card-body">
+                                    <h4 class="font-semibold text-sm mb-3">Device Visibility</h4>
+                                    
+                                    <!-- Control buttons -->
+                                    <div class="flex gap-2 mb-3">
+                                        <button id="showAllBtn" class="btn btn-success btn-sm flex-1">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                                            </svg>
+                                            Show All
+                                        </button>
+                                        <button id="hideAllBtn" class="btn btn-error btn-sm flex-1">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L8.464 8.464a1 1 0 00-1.414 0l-.707.707a1 1 0 000 1.414L9.878 9.878zM12 6.5a9.97 9.97 0 00-7.071 2.929" />
+                                            </svg>
+                                            Hide All
+                                        </button>
+                                    </div>
+
+                                    <!-- Search box -->
+                                    <div class="form-control mb-3">
+                                        <input id="deviceSearch" type="text" placeholder="Search devices..." class="input input-bordered input-sm" />
+                                    </div>
+
+                                    <!-- Device list -->
+                                    <div id="deviceFilterList" class="max-h-60 overflow-y-auto">
+                                        <!-- Device checkboxes will be populated here -->
+                                    </div>
+                                    <div class="divider my-2"></div>
+                                    
+                                    <!-- Statistics -->
+                                    <div class="flex justify-between text-xs text-base-content/60">
+                                        <span>Visible: <span id="visibleCount" class="font-semibold">0</span></span>
+                                        <span>Total: <span id="totalCount" class="font-semibold">0</span></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="stats stats-horizontal">
+                            <div class="stat">
+                                <div class="stat-title">Positions</div>
+                                <div class="stat-value text-lg">{{ positions|length }}</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Map container -->
+                    <div id="map" class="w-full h-96 rounded-lg border border-base-300"></div>
+                </div>
+            </div>
+
+            <!-- Position History Table -->
+            <div class="card bg-base-100 shadow-lg">
+                <div class="card-body">
+                    <h3 class="card-title mb-4">Recent Position Updates</h3>
+                    <div class="overflow-x-auto">
+                        <table class="table w-full">
+                            <thead>
+                                <tr>
+                                    <th>Node ID</th>
+                                    <th>Coordinates</th>
+                                    <th>Altitude</th>
+                                    <th>Timestamp</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for position in positions[:20] %}
+                                <tr>
+                                    <td>
+                                        <div class="flex flex-col">
+                                            <span class="font-mono text-sm">{{ position.node_id }}</span>
+                                            {% if position.long_name %}
+                                                <span class="text-xs text-base-content/60">{{ position.long_name }}</span>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                    <td class="text-sm">
+                                            {{ position.latitude|round(6) }}, 
+                                            {{ position.longitude|round(6) }}
+                                    </td>
+                                    <td>
+                                        {% if position.altitude %}
+                                            {{ position.altitude }}m
+                                        {% else %}
+                                            <span class="text-base-content/50">N/A</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-sm">{{ position.timestamp | strftime('%H:%M:%S') }}</td>
+                                    <td>
+                                        <button class="btn btn-xs btn-outline" 
+                                                onclick="focusNode('{{ position.node_id }}', {{ position.latitude }}, {{ position.longitude }})">
+                                            Focus
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Include Leaflet.js for mapping -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" 
+          integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" 
+          crossorigin=""/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+            integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+            crossorigin=""></script>
+
+    <script>
+        // Initialize map
+        const map = L.map('map').setView([39.8283, -98.5795], 4); // Center of US
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+        // Global variables for filtering
+        let deviceLayers = new Map();
+        const positions = {{ positions_json|safe }};
+        
+        // Track markers by node
+        // Track markers by node
+        const nodeMarkers = {};
+        const nodeColors = ['red', 'blue', 'green', 'orange', 'purple', 'yellow', 'pink', 'gray'];
+        let colorIndex = 0;
+
+        // Add markers for each position
+        positions.forEach(position => {
+            if (!nodeMarkers[position.node_id]) {
+                nodeMarkers[position.node_id] = {
+                    color: nodeColors[colorIndex % nodeColors.length],
+                    positions: []
+                };
+                colorIndex++;
+            }
+            
+            nodeMarkers[position.node_id].positions.push(position);
+        });
+        // Store all unique device IDs for filtering
+        const allDevices = Object.keys(nodeMarkers);
+
+        // Create markers and paths for each node
+        Object.keys(nodeMarkers).forEach(nodeId => {
+            const nodeData = nodeMarkers[nodeId];
+            const positions = nodeData.positions.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+            const color = nodeData.color;
+
+            // Create path from position history
+            if (positions.length > 1) {
+                const path = positions.map(p => [p.latitude, p.longitude]);
+                const polyline = L.polyline(path, {
+                    color: color,
+                    weight: 2,
+                    opacity: 0.6
+                }).addTo(map);
+            }
+            // Add marker for latest position
+            const latest = positions[positions.length - 1];
+            const marker = L.circleMarker([latest.latitude, latest.longitude], {
+                color: color,
+                fillColor: color,
+                fillOpacity: 0.7,
+                radius: 8
+            }).addTo(map);
+
+            // Popup with node information
+            const nodeInfo = latest.long_name ? `${latest.long_name} (${nodeId})` : nodeId;
+            const hardwareInfo = latest.hardware_model ? `<strong>Hardware:</strong> ${latest.hardware_model}<br>` : '';
+            const batteryInfo = latest.battery_level ? `<strong>Battery:</strong> ${latest.battery_level}%<br>` : '';
+            
+            marker.bindPopup(`
+                <div class="text-sm">
+                    <strong>Node:</strong> ${nodeInfo}<br>
+                    ${hardwareInfo}
+                    <strong>Position:</strong> ${latest.latitude.toFixed(6)}, ${latest.longitude.toFixed(6)}<br>
+                    ${latest.altitude ? `<strong>Altitude:</strong> ${latest.altitude}m<br>` : ''}
+                    ${batteryInfo}
+                    <strong>Last Update:</strong> ${latest.timestamp}<br>
+                    <strong>Total Positions:</strong> ${positions.length}
+                </div>
+            `);
+            
+            // Create a layer group for this device (marker + path)
+            const layerGroup = L.layerGroup();
+            if (positions.length > 1) {
+                layerGroup.addLayer(L.polyline(positions.map(p => [p.latitude, p.longitude]), {color: color, weight: 2, opacity: 0.6}));
+            }
+            layerGroup.addLayer(marker);
+            deviceLayers.set(nodeId, layerGroup);
+        });
+
+        // Auto-fit map to show all markers
+        if (Object.keys(nodeMarkers).length > 0) {
+            const group = new L.featureGroup(
+                Object.values(nodeMarkers).map(data => {
+                    const latest = data.positions[data.positions.length - 1];
+                    return L.marker([latest.latitude, latest.longitude]);
+                })
+            );
+            map.fitBounds(group.getBounds().pad(0.1));
+        }
+
+        // Function to focus on a specific node
+        function focusNode(nodeId, lat, lng) {
+            map.setView([lat, lng], 15);
+            
+            // Find and open the marker popup
+            map.eachLayer(layer => {
+                if (layer instanceof L.CircleMarker) {
+                    const popup = layer.getPopup();
+                    if (popup && popup.getContent().includes(nodeId)) {
+                        layer.openPopup();
+                    }
+                }
+            });
+        }
+        // Initialize device filter UI
+        function initDeviceFilter() {
+            const filterList = document.getElementById('deviceFilterList');
+            const sortedDevices = allDevices.sort();
+            
+            filterList.innerHTML = '';
+            
+            sortedDevices.forEach(nodeId => {
+                const nodeData = nodeMarkers[nodeId];
+                const color = nodeData.color;
+                const positionCount = nodeData.positions.length;
+                const longName = nodeData.positions[nodeData.positions.length - 1].long_name || nodeId;
+                
+                const deviceItem = document.createElement('div');
+                deviceItem.className = 'p-2 rounded hover:bg-base-200 transition-colors device-filter-item';
+                deviceItem.innerHTML = `
+                    <label class="label cursor-pointer">
+                        <div class="flex items-center gap-3 flex-1">
+                            <div class="w-3 h-3 rounded-full flex-shrink-0" style="background-color: ${color}"></div>
+                            <div class="flex-1 min-w-0">
+                                <div class="text-sm font-medium truncate">${longName}</div>
+                                <div class="text-xs text-base-content/60 font-mono">${nodeId}</div>
+                            </div>
+                            <span class="badge badge-outline badge-sm">${positionCount}</span>
+                        </div>
+                        <input type="checkbox" class="checkbox checkbox-sm" data-device="${nodeId}" checked>
+                    </label>
+                `;
+                
+                filterList.appendChild(deviceItem);
+                
+                // Add event listener for checkbox
+                const checkbox = deviceItem.querySelector('input[type="checkbox"]');
+                checkbox.addEventListener('change', (e) => {
+                    toggleDeviceVisibility(nodeId, e.target.checked);
+                });
+            });
+            
+            updateFilterStatistics();
+        }
+
+        // Toggle device visibility
+        function toggleDeviceVisibility(nodeId, isVisible) {
+            // Toggle path visibility
+            map.eachLayer(layer => {
+                if (layer instanceof L.Polyline) {
+                    const popup = layer.getPopup();
+                    if (popup && popup.getContent().includes(nodeId)) {
+                        if (isVisible) {
+                            layer.setStyle({opacity: 0.6});
+                        } else {
+                            layer.setStyle({opacity: 0});
+                        }
+                    }
+                }
+            });
+            
+            // Toggle marker visibility
+            map.eachLayer(layer => {
+                if (layer instanceof L.CircleMarker) {
+                    const popup = layer.getPopup();
+                    if (popup && popup.getContent().includes(nodeId)) {
+                        if (isVisible) {
+                            layer.setStyle({fillOpacity: 0.7, opacity: 1});
+                        } else {
+                            layer.setStyle({fillOpacity: 0, opacity: 0});
+                        }
+                    }
+                }
+            });
+            
+            updateFilterStatistics();
+        }
+
+        // Update filter statistics
+        function updateFilterStatistics() {
+            const totalDevices = allDevices.length;
+            const checkedBoxes = document.querySelectorAll('#deviceFilterList input[type="checkbox"]:checked').length;
+            const visibleDevices = checkedBoxes;
+            const hiddenDevices = totalDevices - visibleDevices;
+            
+            document.getElementById('visibleCount').textContent = visibleDevices;
+            document.getElementById('totalCount').textContent = totalDevices;
+            document.getElementById('activeFilterBadge').textContent = hiddenDevices;
+        }
+
+        // Show/hide all devices
+        document.getElementById('showAllBtn').addEventListener('click', () => {
+            const checkboxes = document.querySelectorAll('#deviceFilterList input[type="checkbox"]');
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = true;
+                const nodeId = checkbox.getAttribute('data-device');
+                toggleDeviceVisibility(nodeId, true);
+            });
+        });
+
+        document.getElementById('hideAllBtn').addEventListener('click', () => {
+            const checkboxes = document.querySelectorAll('#deviceFilterList input[type="checkbox"]');
+            checkboxes.forEach(checkbox => {
+                checkbox.checked = false;
+                const nodeId = checkbox.getAttribute('data-device');
+                toggleDeviceVisibility(nodeId, false);
+            });
+        });
+
+        // Search filter
+        document.getElementById('deviceSearch').addEventListener('input', (e) => {
+            const searchTerm = e.target.value.toLowerCase();
+            const deviceItems = document.querySelectorAll('.device-filter-item');
+            
+            deviceItems.forEach(item => {
+                const text = item.textContent.toLowerCase();
+                item.style.display = text.includes(searchTerm) ? 'block' : 'none';
+            });
+        });
+
+        // Initialize the device filter after map setup
+        if (allDevices.length > 0) {
+            initDeviceFilter();
+        }
+
+        // Auto-refresh every 30 seconds
+        setInterval(() => {
+            location.reload();
+        }, 30000);
+    </script>
+{% endblock %}

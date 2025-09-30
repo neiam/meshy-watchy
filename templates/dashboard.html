@@ -1,0 +1,646 @@
+{% extends "root.html" %}
+
+{% block content %}
+    <div class="min-h-screen">
+        <header class="mb-8">
+            <h1 class="text-4xl font-bold mb-2">🕸️ Mesh Network Dashboard</h1>
+            <p class="text-base-content/60">Real-time Meshtastic Network Monitor</p>
+        </header>
+
+        <main>
+            <!-- Network Overview -->
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                <div class="card bg-base-100 shadow-lg">
+                    <div class="card-body">
+                        <h3 class="card-title text-lg">Total Nodes</h3>
+                        <p class="text-3xl font-bold text-primary">{{ overview.total_nodes }}</p>
+                    </div>
+                </div>
+                
+                <div class="card bg-base-100 shadow-lg">
+                    <div class="card-body">
+                        <h3 class="card-title text-lg">Active Nodes</h3>
+                        <p class="text-3xl font-bold text-good">{{ overview.active_nodes }}</p>
+                    </div>
+                </div>
+                
+                <div class="card bg-base-100 shadow-lg">
+                    <div class="card-body">
+                        <h3 class="card-title text-lg">Messages Today</h3>
+                        <p class="text-3xl font-bold text-info">{{ overview.messages_today }}</p>
+                    </div>
+                </div>
+                
+                <div class="card bg-base-100 shadow-lg">
+                    <div class="card-body">
+                        <h3 class="card-title text-lg">Webhooks</h3>
+                        <p class="text-3xl font-bold text-secondary">{{ webhook_stats|length }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Recent Activity -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                <div class="card bg-base-100 shadow-lg">
+                    <div class="card-body">
+                        <h3 class="card-title">Recent Nodes</h3>
+                        <div class="overflow-x-auto">
+                            <table class="table table-compact w-full">
+                                <thead>
+                                    <tr>
+                                        <th>Node ID</th>
+                                        <th>Name</th>
+                                        <th>Last Seen</th>
+                                        <th>Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for node in nodes[:5] %}
+                                    <tr>
+                                        <td class="font-mono text-sm">{{ node.node_id }}</td>
+                                        <td>{{ node.short_name|default('Unknown', true) }}</td>
+                                        <td class="text-sm" data-timestamp="{{ node.last_seen }}">{{ node.last_seen|timeago }}</td>
+                                        <td>
+                                            {% if node.is_active %}
+                                                <span class="badge badge-success">Active</span>
+                                            {% else %}
+                                                <span class="badge badge-neutral">Inactive</span>
+                                            {% endif %}
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="card-actions justify-end mt-4">
+                            <a href="/nodes" class="btn btn-primary btn-sm">View All</a>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="card bg-base-100 shadow-lg">
+                    <div class="card-body">
+                        <h3 class="card-title">Recent Positions</h3>
+                        <div class="overflow-x-auto">
+                            <table class="table table-compact w-full">
+                                <thead>
+                                    <tr>
+                                        <th>Node</th>
+                                        <th>Coordinates</th>
+                                        <th>Time</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for position in recent_positions[:5] %}
+                                    <tr>
+                                        <td class="font-mono text-sm">{{ position.node_id }}</td>
+                                        <td class="text-sm">
+                                            {{ position.latitude|round(4) }}, 
+                                            {{ position.longitude|round(4) }}
+                                        </td>
+                                        <td class="text-sm">{{ position.timestamp | strftime('%H:%M:%S') }}</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="card-actions justify-end mt-4">
+                            <a href="/map" class="btn btn-primary btn-sm">View Map</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            
+<!--            &lt;!&ndash; Battery Status Overview &ndash;&gt;-->
+<!--            <div class="card bg-base-100 shadow-lg mb-8">-->
+<!--                <div class="card-body">-->
+<!--                    <div class="flex justify-between items-center mb-4">-->
+<!--                        <h3 class="card-title">-->
+<!--                            <i class="fas fa-battery-three-quarters mr-2"></i>-->
+<!--                            Battery Status-->
+<!--                        </h3>-->
+<!--                        <button class="btn btn-ghost btn-sm" onclick="refreshBatteryData()">-->
+<!--                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">-->
+<!--                                <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd"/>-->
+<!--                            </svg>-->
+<!--                            Refresh-->
+<!--                        </button>-->
+<!--                    </div>-->
+<!--                    -->
+<!--                    <div id="batteryStatusContainer">-->
+<!--                        <div class="flex items-center justify-center py-8">-->
+<!--                            <span class="loading loading-spinner loading-md mr-2"></span>-->
+<!--                            <span class="text-base-content/60">Loading battery data...</span>-->
+<!--                        </div>-->
+<!--                    </div>-->
+<!--                </div>-->
+<!--            </div>-->
+
+            <!-- Recent Messages with Expandable JSON -->
+            <div class="card bg-base-100 shadow-lg mb-8">
+                <div class="card-body">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="card-title">
+                            <i class="fas fa-rss mr-2"></i>
+                            Recent Messages
+                        </h3>
+                        <div class="badge badge-info">
+                            {{ recent_messages|length }} messages
+                        </div>
+                    </div>
+                    
+                    <div class="overflow-x-auto">
+                        <table class="table table-zebra w-full">
+                            <thead>
+                                <tr>
+                                    <th width="10%">Type</th>
+                                    <th width="15%">From</th>
+                                    <th width="15%">To</th>
+                                    <th width="10%">Channel</th>
+                                    <th width="20%">Timestamp</th>
+                                    <th width="15%">Gateway</th>
+                                    <th width="15%">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for message in recent_messages %}
+                                <!-- Main message row -->
+                                <tr class="hover cursor-pointer" 
+                                    onclick="toggleMessageDetails('message-{{ message.id }}')"
+                                    data-message-id="{{ message.id }}">
+                                    <td>
+                                        <span class="badge badge-outline message-type-{{ message.message_type }}">
+                                            {% if message.message_type == "position" %}
+                                                <i class="fas fa-map-marker-alt mr-1"></i>
+                                                Position
+                                            {% elif message.message_type == "nodeinfo" %}
+                                                <i class="fas fa-info-circle mr-1"></i>
+                                                Node Info
+                                            {% elif message.message_type == "telemetry" %}
+                                                <i class="fas fa-chart-line mr-1"></i>
+                                                Telemetry
+                                            {% else %}
+                                                <i class="fas fa-envelope mr-1"></i>
+                                                {{ message.message_type|title }}
+                                            {% endif %}
+                                        </span>
+                                    </td>
+                                    <td class="font-mono text-sm">{{ message.from_node }}</td>
+                                    <td class="font-mono text-sm">{{ message.to_node|default('Broadcast', true) }}</td>
+                                    <td>
+                                        {% if message.channel %}
+                                            <span class="badge badge-ghost">Ch {{ message.channel }}</span>
+                                        {% else %}
+                                            <span class="text-base-content/50">-</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-sm">
+                                        {{ message.timestamp | strftime('%H:%M:%S') }}
+                                        <br>
+                                        <span class="text-xs text-base-content/60">
+                                            {{ message.timestamp | strftime('%Y-%m-%d') }}
+                                        </span>
+                                    </td>
+                                    <td class="text-sm">
+                                        {% if message.gateway %}
+                                            <span class="badge badge-secondary badge-sm">{{ message.gateway }}</span>
+                                        {% else %}
+                                            <span class="text-base-content/50">Direct</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="flex gap-1">
+                                            <button class="btn btn-xs btn-outline btn-info" 
+                                                    onclick="event.stopPropagation(); toggleMessageDetails('message-{{ message.id }}')"
+                                                    title="Toggle JSON details">
+                                                <i class="fas fa-code"></i>
+                                            </button>
+                                            <button class="btn btn-xs btn-outline btn-secondary" 
+                                                    onclick="event.stopPropagation(); copyMessageJson({{ message.raw_json|tojson }})"
+                                                    title="Copy JSON">
+                                                <i class="fas fa-copy"></i>
+                                            </button>
+                                        </div>
+                                    </td>
+                                </tr>
+                                
+                                <!-- Hidden expandable details row -->
+                                <tr id="message-{{ message.id }}" class="message-details" style="display: none;">
+                                    <td colspan="7" class="p-0">
+                                        <div class="bg-base-200 p-4 border-l-4 border-primary">
+                                            <div class="flex justify-between items-start mb-3">
+                                                <h4 class="font-semibold text-base-content/80">
+                                                    <i class="fas fa-file-code mr-2"></i>
+                                                    Raw Message Data
+                                                </h4>
+                                                <div class="flex gap-2">
+                                                    <button class="btn btn-xs btn-outline" 
+                                                            onclick="copyMessageJson({{ message.raw_json|tojson }})">
+                                                        <i class="fas fa-copy mr-1"></i>Copy
+                                                    </button>
+                                                    <button class="btn btn-xs btn-outline btn-error" 
+                                                            onclick="toggleMessageDetails('message-{{ message.id }}')">
+                                                        <i class="fas fa-times"></i>
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <div class="bg-base-300 p-3 rounded-lg">
+                                                <pre class="text-xs overflow-x-auto"><code class="language-json">{{ message.raw_json|tojson(indent=2) }}</code></pre>
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    {% if recent_messages|length == 0 %}
+                        <div class="text-center py-8">
+                            <i class="fas fa-inbox text-4xl text-base-content/20 mb-4"></i>
+                            <h4 class="text-lg font-semibold mb-2">No messages yet</h4>
+                            <p class="text-base-content/60">Messages will appear here as they arrive from the mesh network.</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Message Statistics -->
+            <div class="card bg-base-100 shadow-lg mb-8">
+                <div class="card-body">
+                    <h3 class="card-title">Message Statistics</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mt-4">
+                        <div class="stat">
+                            <div class="stat-title">Position Updates</div>
+                            <div class="stat-value text-primary">{{ message_stats.POSITION|default(0) }}</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-title">Telemetry Data</div>
+                            <div class="stat-value text-secondary">{{ message_stats.TELEMETRY|default(0) }}</div>
+                        </div>
+                        <div class="stat">
+                            <div class="stat-title">Node Info</div>
+                            <div class="stat-value text-accent">{{ message_stats.NODEINFO|default(0) }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Webhook Status -->
+            <div class="card bg-base-100 shadow-lg">
+                <div class="card-body">
+                    <h3 class="card-title">Webhook Status</h3>
+                    <div class="overflow-x-auto">
+                        <table class="table w-full">
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>URL</th>
+                                    <th>Status</th>
+                                    <th>Sent</th>
+                                    <th>Failed</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for webhook in webhook_stats %}
+                                <tr>
+                                    <td class="font-semibold">{{ webhook.name }}</td>
+                                    <td class="font-mono text-sm">{{ webhook.url }}</td>
+                                    <td>
+                                        {% if webhook.enabled %}
+                                            <span class="badge badge-success">Enabled</span>
+                                        {% else %}
+                                            <span class="badge badge-error">Disabled</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-good">{{ webhook.total_sent }}</td>
+                                    <td class="text-danger">{{ webhook.total_failed }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="card-actions justify-end mt-4">
+                        <a href="/webhooks" class="btn btn-primary btn-sm">Manage Webhooks</a>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+{% endblock %}
+
+<script>
+    // Message details toggle functionality
+    function toggleMessageDetails(messageId) {
+        const detailsRow = document.getElementById(messageId);
+        if (detailsRow.style.display === 'none') {
+            detailsRow.style.display = 'table-row';
+            // Scroll the details into view
+            detailsRow.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        } else {
+            detailsRow.style.display = 'none';
+        }
+    }
+    
+    // Copy JSON to clipboard
+    function copyMessageJson(jsonData) {
+        const jsonString = JSON.stringify(jsonData, null, 2);
+        
+        if (navigator.clipboard) {
+            navigator.clipboard.writeText(jsonString).then(() => {
+                // Show success notification
+                if (window.notifications) {
+                    window.notifications.show('JSON copied to clipboard!', 'success', 3000);
+                } else {
+                    // Fallback alert
+                    const notification = document.createElement('div');
+                    notification.className = 'alert alert-success shadow-lg fixed top-4 right-4 z-50 max-w-sm';
+                    notification.innerHTML = `
+                        <div>
+                            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                            </svg>
+                            <span>JSON copied to clipboard!</span>
+                        </div>
+                    `;
+                    document.body.appendChild(notification);
+                    setTimeout(() => notification.remove(), 3000);
+                }
+            }).catch(() => {
+                fallbackCopyTextToClipboard(jsonString);
+            });
+        } else {
+            fallbackCopyTextToClipboard(jsonString);
+        }
+    }
+    
+    // Fallback copy function for older browsers
+    function fallbackCopyTextToClipboard(text) {
+        const textArea = document.createElement('textarea');
+        textArea.value = text;
+        textArea.style.position = 'fixed';
+        textArea.style.left = '-999999px';
+        textArea.style.top = '-999999px';
+        document.body.appendChild(textArea);
+        textArea.focus();
+        textArea.select();
+        
+        try {
+            document.execCommand('copy');
+            alert('JSON copied to clipboard!');
+        } catch (err) {
+            alert('Unable to copy to clipboard');
+        }
+        
+        document.body.removeChild(textArea);
+    }
+    
+    // Battery data refresh functionality
+    async function refreshBatteryData() {
+        const container = document.getElementById('batteryStatusContainer');
+        if (!container) return;
+        
+        container.innerHTML = `
+            <div class="flex items-center justify-center py-8">
+                <span class="loading loading-spinner loading-md mr-2"></span>
+                <span class="text-base-content/60">Loading battery data...</span>
+            </div>
+        `;
+        
+        try {
+            const response = await fetch('/api/telemetry');
+            if (response.ok) {
+                const telemetryData = await response.json();
+                displayBatteryData(telemetryData);
+            } else {
+                container.innerHTML = `
+                    <div class="text-center py-8">
+                        <span class="text-error">Failed to load battery data</span>
+                    </div>
+                `;
+            }
+        } catch (error) {
+            console.error('Failed to fetch battery data:', error);
+            container.innerHTML = `
+                <div class="text-center py-8">
+                    <span class="text-error">Error loading battery data</span>
+                </div>
+            `;
+        }
+    }
+    
+    function displayBatteryData(telemetryData) {
+        const container = document.getElementById('batteryStatusContainer');
+        if (!container || !telemetryData || telemetryData.length === 0) {
+            container.innerHTML = `
+                <div class="text-center py-8">
+                    <span class="text-base-content/50">No battery data available</span>
+                </div>
+            `;
+            return;
+        }
+        
+        // Sort by node_id for consistent display
+        const sortedData = telemetryData.sort((a, b) => a.node_id.localeCompare(b.node_id));
+        
+        let html = '<div class="space-y-3">';
+        
+        for (const telemetry of sortedData) {
+            const hasChart = telemetry.battery_chart && telemetry.battery_chart.trim() && 
+                           telemetry.battery_chart !== '────────────────────';
+            
+            html += `
+                <div class="bg-base-200 p-3 rounded-lg">
+                    <div class="flex justify-between items-center mb-2">
+                        <div class="font-mono text-sm font-medium">${telemetry.node_id}</div>
+                        <div class="text-sm">
+                            ${telemetry.battery_level !== null ? 
+                              `<span class="badge badge-outline">${telemetry.battery_level}%</span>` : 
+                              '<span class="text-base-content/50">No data</span>'}
+                        </div>
+                    </div>
+            `;
+            
+            if (hasChart) {
+                html += `
+                    <div class="mb-2">
+                        <div class="font-mono text-lg tracking-wider" style="line-height: 1.2; letter-spacing: 0.1em;">
+                            ${telemetry.battery_chart}
+                        </div>
+                    </div>
+                `;
+            }
+            
+            // Show additional telemetry details
+            const details = [];
+            if (telemetry.voltage !== null) {
+                details.push(`${telemetry.voltage.toFixed(2)}V`);
+            }
+            if (telemetry.uptime_seconds !== null) {
+                const uptime = formatUptime(telemetry.uptime_seconds);
+                details.push(`Up: ${uptime}`);
+            }
+            
+            if (details.length > 0) {
+                html += `
+                    <div class="text-xs text-base-content/60">
+                        ${details.join(' • ')}
+                    </div>
+                `;
+            }
+            
+            html += '</div>';
+        }
+        
+        html += '</div>';
+        
+        if (hasChart) {
+            html += `
+                <div class="text-xs text-base-content/50 mt-3 text-center">
+                    ▁▂▃▄▅▆▇█ = Battery levels over time | 🔌 = Charging | ─ = No data
+                </div>
+            `;
+        }
+        
+        container.innerHTML = html;
+    }
+    
+    function formatUptime(seconds) {
+        if (seconds < 60) return `${seconds}s`;
+        if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
+        if (seconds < 86400) return `${Math.floor(seconds / 3600)}h`;
+        return `${Math.floor(seconds / 86400)}d`;
+    }
+    
+    // Format timestamp as "time ago"
+    function formatTimeAgo(timestamp) {
+        const now = Math.floor(Date.now() / 1000);
+        const diff = now - timestamp;
+        
+        if (diff < 0) return "in the future";
+        
+        if (diff < 60) {
+            return diff === 1 ? "1 second ago" : `${diff} seconds ago`;
+        } else if (diff < 3600) {
+            const minutes = Math.floor(diff / 60);
+            return minutes === 1 ? "1 minute ago" : `${minutes} minutes ago`;
+        } else if (diff < 86400) {
+            const hours = Math.floor(diff / 3600);
+            return hours === 1 ? "1 hour ago" : `${hours} hours ago`;
+        } else if (diff < 2592000) { // 30 days
+            const days = Math.floor(diff / 86400);
+            return days === 1 ? "1 day ago" : `${days} days ago`;
+        } else if (diff < 31536000) { // 365 days
+            const months = Math.floor(diff / 2592000);
+            return months === 1 ? "1 month ago" : `${months} months ago`;
+        } else {
+            const years = Math.floor(diff / 31536000);
+            return years === 1 ? "1 year ago" : `${years} years ago`;
+        }
+    }
+    
+    // WebSocket connection for real-time updates
+    function initializeWebSocket() {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}/ws`;
+        
+        let ws = null;
+        let reconnectInterval = null;
+        
+        function connect() {
+            try {
+                ws = new WebSocket(wsUrl);
+                
+                ws.onopen = function() {
+                    console.log('WebSocket connected');
+                    clearInterval(reconnectInterval);
+                };
+                
+                ws.onmessage = function(event) {
+                    try {
+                        const data = JSON.parse(event.data);
+                        handleWebSocketMessage(data);
+                    } catch (e) {
+                        console.error('Failed to parse WebSocket message:', e);
+                    }
+                };
+                
+                ws.onclose = function() {
+                    console.log('WebSocket disconnected, attempting to reconnect...');
+                    setTimeout(connect, 5000);
+                };
+                
+                ws.onerror = function(error) {
+                    console.error('WebSocket error:', error);
+                    ws.close();
+                };
+                
+            } catch (e) {
+                console.error('Failed to create WebSocket connection:', e);
+                setTimeout(connect, 5000);
+            }
+        }
+        
+        function handleWebSocketMessage(data) {
+            switch (data.type) {
+                case 'new_message':
+                    console.log('New message received:', data.message);
+                    // Update last seen times dynamically
+                    updateLastSeenTimes();
+                    break;
+                case 'node_update':
+                    console.log('Node update received:', data.node);
+                    updateLastSeenTimes();
+                    break;
+                case 'network_stats':
+                    console.log('Network stats update:', data.overview);
+                    break;
+                default:
+                    console.log('Unknown WebSocket message type:', data.type);
+            }
+        }
+        
+        function updateLastSeenTimes() {
+            // Update all timeago elements on the page
+            const timeElements = document.querySelectorAll('[data-timestamp]');
+            timeElements.forEach(element => {
+                const timestamp = parseInt(element.dataset.timestamp);
+                if (timestamp) {
+                    element.textContent = formatTimeAgo(timestamp);
+                }
+            });
+        }
+        
+        connect();
+    }
+    
+    // Load battery data on page load
+    document.addEventListener('DOMContentLoaded', function() {
+        refreshBatteryData();
+        initializeWebSocket();
+    });
+    
+    // Keyboard shortcuts for message table
+    document.addEventListener('keydown', function(event) {
+        // Escape key to close all expanded message details
+        if (event.key === 'Escape') {
+            const expandedRows = document.querySelectorAll('.message-details[style*="table-row"]');
+            expandedRows.forEach(row => {
+                row.style.display = 'none';
+            });
+        }
+        
+        // 'c' key to copy the first visible message JSON
+        if (event.key === 'c' && !event.ctrlKey && !event.metaKey && event.target.tagName !== 'INPUT') {
+            const firstMessage = document.querySelector('[data-message-id]');
+            if (firstMessage) {
+                const copyButton = firstMessage.querySelector('button[title="Copy JSON"]');
+                if (copyButton) {
+                    copyButton.click();
+                    event.preventDefault();
+                }
+            }
+        }
+    });
+</script>

@@ -1,0 +1,26 @@
+{
+  "name": "mesh-watchy-assets",
+  "version": "1.0.0",
+  "description": "Frontend assets for Mesh Watchy application",
+  "scripts": {
+    "pave": "mkdir -p ./dist/css/files && mkdir -p ./dist/js && mkdir -p ./dist/webfonts && mkdir -p ./dist/img",
+    "dev": "tailwindcss -i ./src/app.css -o ./dist/css/app.css --watch",
+    "build": "tailwindcss -i ./src/app.css -o ./dist/css/app.css --minify",
+    "build:js": "cp ./src/app.js ./dist/js/app.js",
+    "build:fonts": "mkdir -p ./dist/css/files && mkdir -p ./dist/webfonts && cp ./node_modules/@fontsource/b612/files/*.woff2 ./dist/css/files/ && cp ./node_modules/@fontsource/b612-mono/files/*.woff2 ./dist/css/files/ && cp ./node_modules/@fortawesome/fontawesome-free/webfonts/*.woff2 ./dist/webfonts/",
+    "build:all": "npm run pave && npm run build && npm run build:js && npm run build:fonts",
+    "watch": "npm run dev"
+  },
+  "dependencies": {
+    "@fontsource/b612": "^5.2.6",
+    "@fontsource/b612-mono": "^5.2.6",
+    "@fortawesome/fontawesome-free": "^6.2.1",
+    "@tailwindcss/forms": "^0.5.10",
+    "alpinejs": "^3.14.9",
+    "daisyui": "^4.12.24",
+    "htmx-ext-ws": "^2.0.3",
+    "htmx.org": "^2.0.4",
+    "tailwindcss": "^3.4.17"
+  },
+  "devDependencies": {}
+}

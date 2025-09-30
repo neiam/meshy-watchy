@@ -1,0 +1,158 @@
+@import '@fontsource/b612';
+@import '@fontsource/b612-mono';
+@import '@fortawesome/fontawesome-free/css/all.min.css';
+@import 'tailwindcss/base';
+@import 'tailwindcss/components';
+@import 'tailwindcss/utilities';
+
+/* Custom styles for Mesh Watchy */
+body {
+  font-family: "B612 Mono", monospace;
+}
+
+/* Theme management utilities */
+.theme-transition {
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Custom component styles */
+.mesh-node-status {
+  @apply inline-flex items-center gap-1;
+}
+
+.mesh-node-active {
+  @apply text-success;
+}
+
+.mesh-node-inactive {
+  @apply text-base-content/50;
+}
+
+/* Map container styles */
+.leaflet-container {
+  @apply rounded-lg;
+}
+
+/* Custom animation classes */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+.pulse-dot {
+  animation: pulse-dot 2s infinite;
+}
+
+/* Webhook status indicators */
+.webhook-enabled {
+  @apply bg-success/10 text-success border-success/20;
+}
+
+.webhook-disabled {
+  @apply bg-error/10 text-error border-error/20;
+}
+
+/* Modal backdrop improvements */
+.modal-backdrop {
+  @apply backdrop-blur-sm;
+}
+
+/* Table improvements for mobile */
+@media (max-width: 768px) {
+  .table-compact th,
+  .table-compact td {
+    @apply px-2 py-1 text-xs;
+  }
+}
+
+/* Loading states */
+.loading-spinner {
+  @apply inline-block w-4 h-4 border-2 border-current border-r-transparent rounded-full animate-spin;
+}
+
+/* Custom scrollbar for webkit browsers */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-base-200 rounded-full;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-base-content/20 rounded-full hover:bg-base-content/40;
+}
+
+/* Message type specific styling */
+.message-type-position {
+  @apply badge-primary;
+}
+
+.message-type-nodeinfo {
+  @apply badge-info;
+}
+
+.message-type-telemetry {
+  @apply badge-warning;
+}
+
+.message-type-text {
+  @apply badge-success;
+}
+
+/* Expandable table rows */
+.message-details {
+  transition: all 0.3s ease-in-out;
+}
+
+.message-details td {
+  animation: slideInFromTop 0.2s ease-out;
+}
+
+@keyframes slideInFromTop {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* JSON syntax highlighting */
+.language-json {
+  @apply text-base-content;
+}
+
+.language-json .hljs-attr {
+  @apply text-primary;
+}
+
+.language-json .hljs-string {
+  @apply text-secondary;
+}
+
+.language-json .hljs-number {
+  @apply text-accent;
+}
+
+.language-json .hljs-literal {
+  @apply text-warning;
+}
+
+/* Print styles */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  
+  body {
+    @apply text-black bg-white;
+  }
+  
+  .card, .stat {
+    @apply border border-gray-300;
+  }
+}
