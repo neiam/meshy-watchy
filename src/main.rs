@@ -1,5 +1,6 @@
+use std::env;
 use std::sync::Arc;
-use tracing::Level;
+use tracing::{info, Level};
 
 mod config;
 mod database;
@@ -25,8 +26,13 @@ async fn main() -> anyhow::Result<()> {
 
     tracing::info!("Starting Mesh Watchy application");
 
+    let config_location =  match env::var("CONFIG_CUSTOM") {
+        Ok(val) => { info!("custom config: {:?}", val); val }
+        Err(_) => { "config.toml".to_string() }
+    };
+
     // Load configuration
-    let config = load_config("config.toml").await?;
+    let config = load_config(config_location.as_str()).await?;
     validate_config(&config)?;
 
     tracing::info!("Configuration loaded successfully");
